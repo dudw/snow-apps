@@ -689,6 +689,7 @@ function Set-SnowBuildEnvironment {
     $clangCommand = Get-Command clang.exe -ErrorAction SilentlyContinue
     $clangCandidates = @($env:LIBCLANG_PATH, $hostLibclang,
         (Join-Path $script:SnowRepoRoot ".tools/llvm/bin"),
+        (Join-Path $env:VCINSTALLDIR "Tools/Llvm/$clangArchitecture/bin"),
         (Join-Path $env:VCINSTALLDIR "Tools/Llvm/ARM64/bin"),
         (Join-Path $env:VCINSTALLDIR "Tools/Llvm/bin"),
         $(if ($clangCommand) { Split-Path -Parent $clangCommand.Source })) | Where-Object { $_ }
@@ -707,6 +708,35 @@ function Set-SnowBuildEnvironment {
     }
     if ($target.Architecture -eq "arm64") {
         $env:CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER = (Get-Command link.exe).Source
+    }
+    # The icon pack generator shells out to a bare `clang-format`, and Visual
+    # Studio ships it under the LLVM tree without adding that directory to
+    # PATH. Append instead of prepend so cl.exe and the Qt tools keep
+    # precedence over clang.exe and clang-cl.exe.
+    if (-not (Get-Command "clang-format" -ErrorAction SilentlyContinue)) {
+        $formatDirectory = @($clangCandidates) | Where-Object {
+            $_ -and (Test-Path -LiteralPath (Join-Path $_ "clang-format.exe") -PathType Leaf)
+        } | Select-Object -First 1
+        if ($formatDirectory) {
+            $env:Path = "$env:Path;$formatDirectory"
+        }
+    }
+    # Launchers and shells sometimes inject PATH under several casings
+    # (Path/path/PATH). MSBuild copies the environment into a case-insensitive
+    # map to spawn CL.exe, so such duplicates abort every compile with MSB6001
+    # before the compiler even starts. Collapse them to a single entry.
+    $pathVariants = @([Environment]::GetEnvironmentVariables().Keys |
+        Where-Object { $_ -match '(?i)^path$' })
+    if ($pathVariants.Count -gt 1) {
+        $mergedPath = @($pathVariants | ForEach-Object {
+                [Environment]::GetEnvironmentVariable($_)
+            }) -join ';'
+        $dedupedPath = @($mergedPath.Split(';') | Where-Object { $_ } |
+            Select-Object -Unique) -join ';'
+        foreach ($variant in $pathVariants) {
+            [Environment]::SetEnvironmentVariable($variant, $null)
+        }
+        $env:Path = $dedupedPath
     }
     return [pscustomobject]@{
         RepoRoot = $script:SnowRepoRoot

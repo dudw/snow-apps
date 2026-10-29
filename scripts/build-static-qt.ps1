@@ -231,7 +231,42 @@ function Assert-QtSourceArchive {
 
     $actualHash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -cne $script:SnowQtToolchain.sourceArchiveSha256) {
-        throw "Qt $script:SnowQtVersion source archive SHA256 mismatch: $Path"
+        $message = "Qt $($script:SnowQtVersion) source archive SHA256 mismatch: $Path" +
+            " (expected $($script:SnowQtToolchain.sourceArchiveSha256), got $actualHash)"
+        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+        throw $message
+    }
+}
+
+function Expand-QtSourceArchive {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArchivePath,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    # The bsdtar shipped with Windows 10 streams .tar.xz through an `xz -d` child
+    # process and deadlocks once the stream outgrows the pipe buffer, which is
+    # always the case for the Qt source archive. Decompress explicitly when a
+    # standalone xz is available, then hand a plain .tar to tar.
+    $xz = Get-Command xz -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($null -eq $xz) {
+        Invoke-Checked -Command "tar" -Arguments @("-xf", $ArchivePath, "-C", $Destination)
+        return
+    }
+    $plainArchivePath = [System.IO.Path]::ChangeExtension($ArchivePath, ".tar")
+    try {
+        Write-Output "Decompressing $([System.IO.Path]::GetFileName($ArchivePath)) with $($xz.Source)"
+        $decompressor = Start-Process -FilePath $xz.Source `
+            -ArgumentList @("-dc", $ArchivePath) `
+            -RedirectStandardOutput $plainArchivePath -NoNewWindow -PassThru -Wait
+        if ($decompressor.ExitCode -ne 0) {
+            throw "xz exited with code $($decompressor.ExitCode) while decompressing $ArchivePath."
+        }
+        Invoke-Checked -Command "tar" -Arguments @("-xf", $plainArchivePath, "-C", $Destination)
+    }
+    finally {
+        Remove-Item -LiteralPath $plainArchivePath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -560,13 +595,26 @@ $zlibArgument = if ($Configuration -eq "Debug") { "-qt-zlib" } else { "-system-z
 $pngArgument = if ($Configuration -eq "Debug") { "-qt-libpng" } else { "-system-libpng" }
 $archivePath = Join-Path ([System.IO.Path]::GetDirectoryName($sourceDirectory)) "qt-everywhere-src-$QtVersion.tar.xz"
 $sourceRelativePath = "qt/$($QtVersion.Substring(0, $QtVersion.LastIndexOf('.')))/$QtVersion/single/qt-everywhere-src-$QtVersion.tar.xz"
-$sourceUrls = @(
-    "$($QtMirrorBaseUrl.TrimEnd('/'))/$sourceRelativePath",
+# Mirrors are given either as a download.qt.io root mirror (e.g. the Tsinghua or
+# USTC /qt tree) or as one of its published subtrees (e.g. .../official_releases).
+# Expand the matching tree so either form resolves to a valid URL.
+$mirrorRoot = $QtMirrorBaseUrl.TrimEnd('/')
+$mirrorUrls = @()
+if ($mirrorRoot -match '/(official_releases|archive)$') {
+    $mirrorUrls += "$mirrorRoot/$sourceRelativePath"
+}
+else {
+    $mirrorUrls += "$mirrorRoot/official_releases/$sourceRelativePath"
+    $mirrorUrls += "$mirrorRoot/archive/$sourceRelativePath"
+}
+$sourceUrls = @($mirrorUrls) + @(
     "https://download.qt.io/official_releases/$sourceRelativePath"
 ) | Select-Object -Unique
 
 if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
     if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        New-Item -ItemType Directory -Force -Path ([System.IO.Path]::GetDirectoryName($archivePath)) |
+            Out-Null
         $downloaded = $false
         foreach ($sourceUrl in $sourceUrls) {
             try {
@@ -581,7 +629,10 @@ if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
             }
         }
         if (-not $downloaded) {
-            throw "All Qt source mirrors failed."
+            throw ("All Qt source mirrors failed. Download qt-everywhere-src-$QtVersion.tar.xz " +
+                "(SHA256 $($script:SnowQtToolchain.sourceArchiveSha256)) manually into " +
+                "'$([System.IO.Path]::GetDirectoryName($archivePath))', or extract it and pass " +
+                "-SourceDirectory with the qt-everywhere-src-$QtVersion tree.")
         }
     }
     Assert-QtSourceArchive -Path $archivePath
@@ -589,7 +640,7 @@ if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
     $extractedSourceDirectory = Join-Path $sourceParent "qt-everywhere-src-$QtVersion"
     New-Item -ItemType Directory -Force -Path $sourceParent | Out-Null
     if (-not (Test-Path -LiteralPath $extractedSourceDirectory -PathType Container)) {
-        Invoke-Checked -Command "tar" -Arguments @("-xf", $archivePath, "-C", $sourceParent)
+        Expand-QtSourceArchive -ArchivePath $archivePath -Destination $sourceParent
     }
     if ($sourceDirectory -ne $extractedSourceDirectory -and
         (Test-Path -LiteralPath $extractedSourceDirectory -PathType Container)) {

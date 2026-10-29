@@ -12,10 +12,12 @@
 #include "snow_shot/presentation/screenshotrecognitionfileexport.h"
 #include <optional>
 #include <QObject>
+#include <QElapsedTimer>
 #include <QJsonObject>
 #include <QPointer>
 #include <QImage>
 #include <QRect>
+#include <QString>
 #include <QVector>
 
 #include <functional>
@@ -41,6 +43,7 @@ struct ScreenshotClipboardOriginalContent;
 
 namespace snow_shot::presentation {
 class WindowShortcutManager;
+class ScreenshotTextResultWindow;
 }
 
 struct ScreenshotOcrControllerContext {
@@ -61,6 +64,10 @@ struct ScreenshotOcrControllerContext {
     std::function<void(const QPointF&)> updateSelectionResize = [](const QPointF&) {};
     std::function<void(const QPointF&)> finishSelectionResize = [](const QPointF&) {};
     snow_shot::presentation::WindowShortcutManager* shortcutManager = nullptr;
+    // Hides the capture overlay and its toolbar without ending the capture session. A detached
+    // result surface takes over the whole interaction while the session keeps the selection and
+    // the cached recognition target alive for "recognize again".
+    std::function<void()> hideCapturePresentation = []() {};
 };
 
 class ScreenshotOcrController final : public QObject {
@@ -157,6 +164,12 @@ class ScreenshotOcrController final : public QObject {
     [[nodiscard]] bool ensureRecognitionWindow();
     void updateRecognitionWindowGeometry();
     void destroyRecognitionWindow();
+    // The standalone text result window mirrors the OCR/translation state of the session.
+    void ensureTextResultWindow();
+    void presentTextResultWindow();
+    void refreshTextResultOcrText();
+    void closeTextResultWindow();
+    [[nodiscard]] QString currentResultText() const;
     [[nodiscard]] QString currentCacheKey() const;
 
     ScreenshotOcrControllerContext m_context;
@@ -174,6 +187,11 @@ class ScreenshotOcrController final : public QObject {
     QImage m_filteredImage;
     QRectF m_filteredCanvasRect;
     std::shared_ptr<ScreenshotOcrPresentation> m_backgroundPresentation;
+    QPointer<snow_shot::presentation::ScreenshotTextResultWindow> m_textResultWindow;
+    QElapsedTimer m_textResultTimer;
+    std::optional<qint64> m_textResultElapsedMs;
+    // Formatting catalog value ("none", "smart", ...) applied to recognized text.
+    QString m_typesetting;
     Mode m_mode = Mode::Text;
     bool m_active = false;
     bool m_copyAndEndCapture = false;

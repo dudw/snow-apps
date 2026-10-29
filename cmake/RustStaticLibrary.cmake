@@ -387,7 +387,8 @@ function(snow_add_rust_static_library target_name)
 endfunction()
 
 function(snow_add_rust_executable target_name)
-    set(options PERFORMANCE_PROFILE NO_DEFAULT_FEATURES REPRODUCIBLE SIZE_OPTIMIZED)
+    set(options PERFORMANCE_PROFILE NO_DEFAULT_FEATURES REPRODUCIBLE SIZE_OPTIMIZED
+        STATIC_CRT)
     set(oneValueArgs PACKAGE MANIFEST_DIR OUTPUT_NAME PRODUCTION_PROFILE TOOLCHAIN)
     set(multiValueArgs FEATURES ENVIRONMENT)
     cmake_parse_arguments(SNOW_RUST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -496,7 +497,10 @@ function(snow_add_rust_executable target_name)
             endif()
         endif()
         set(_snow_rust_static_crt FALSE)
-        if(SNOW_APPS_RELEASE_STATIC OR SNOW_SHOT_RELEASE_STATIC OR
+        # STATIC_CRT targets link static-CRT dependencies (crashpad is always
+        # built that way, see cmake/vcpkg-overlay-ports/crashpad) even when the
+        # workspace itself links the dynamic CRT.
+        if(SNOW_RUST_STATIC_CRT OR SNOW_APPS_RELEASE_STATIC OR SNOW_SHOT_RELEASE_STATIC OR
            (CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "^MultiThreaded" AND
             NOT CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "DLL"))
             set(_snow_rust_static_crt TRUE)

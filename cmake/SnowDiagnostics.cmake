@@ -54,13 +54,11 @@ if(WIN32)
     target_include_directories(snow_ocr_diagnostics_bridge SYSTEM PRIVATE
         "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/crashpad"
         "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include")
-    if(SNOW_SHOT_RELEASE_STATIC OR SNOW_APPS_RELEASE_STATIC OR
-       (CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "^MultiThreaded" AND
-        NOT CMAKE_MSVC_RUNTIME_LIBRARY MATCHES "DLL"))
-        set_property(TARGET snow_ocr_diagnostics_bridge PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded)
-    else()
-        set_property(TARGET snow_ocr_diagnostics_bridge PROPERTY MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
-    endif()
+    # crashpad is built with the static CRT in every Windows build (see
+    # cmake/vcpkg-overlay-ports/crashpad), and the bridge is only consumed by
+    # the OCR process, which links that static CRT payload. Match it here even
+    # when the workspace itself links the dynamic CRT.
+    set_property(TARGET snow_ocr_diagnostics_bridge PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded)
     target_compile_options(snow_ocr_diagnostics_bridge PRIVATE /Brepro /Z7 /U_DEBUG)
     set_property(TARGET snow_ocr_diagnostics_bridge PROPERTY STATIC_LIBRARY_OPTIONS /Brepro)
     target_compile_definitions(snow_ocr_diagnostics_bridge PRIVATE NDEBUG _ITERATOR_DEBUG_LEVEL=0 NOMINMAX WIN32_LEAN_AND_MEAN)

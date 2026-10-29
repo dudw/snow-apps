@@ -119,6 +119,10 @@ class ScreenshotRecognitionSessionController final : public QObject {
     void releaseTargetImage();
     // Independent image editors show results directly, without image overlays or companion windows.
     void setIndependentEditing(bool enabled);
+    // External result hosts render text and translation outside the capture overlay, so the
+    // session keeps text-mode translation and never hands an editor to the overlay surface.
+    void setExternalTextResultHost(bool enabled);
+    [[nodiscard]] bool externalTextResultHost() const;
     [[nodiscard]] QHash<QString, QByteArray> contentCheckpoints() const;
     [[nodiscard]] QString activeContentKey() const;
     // Updates an existing formatted target's appearance without resetting session state.
@@ -135,6 +139,8 @@ class ScreenshotRecognitionSessionController final : public QObject {
     void activate(Mode mode);
     void setRecognitionModel(const QString& selection);
     void retryRecognition();
+    // Re-runs interactive text recognition for the current target, discarding its cached result.
+    void reRecognizeText();
     [[nodiscard]] QString recognitionModelSelection(Mode mode) const;
     void deactivate();
     void invalidate();
@@ -167,6 +173,11 @@ class ScreenshotRecognitionSessionController final : public QObject {
     void applyTextFormatting(const QString& value);
     void applyTextPunctuation(const QString& value);
     void applyTextTargetLanguage(const QString& language);
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+    [[nodiscard]] QString translationSourceLanguage() const;
+    [[nodiscard]] QString translationTargetLanguage() const;
+    void applyTextSourceLanguage(const QString& language);
+#endif
     [[nodiscard]] bool editing() const;
     [[nodiscard]] bool translating() const;
     [[nodiscard]] bool originalImageTranslationActive() const;
@@ -441,6 +452,7 @@ class ScreenshotRecognitionSessionController final : public QObject {
     bool m_active = false;
     bool m_showOriginalImage = false;
     bool m_independentEditing = false;
+    bool m_externalTextResultHost = false;
     // "Shown" tracks the visible download prompt; "in progress" tracks that
     // asset acquisition is still pending for the in-flight text request, even
     // while only cache verification or helper start-up is running.

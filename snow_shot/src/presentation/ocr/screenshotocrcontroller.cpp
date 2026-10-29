@@ -14,6 +14,7 @@
 #include "snow_shot/presentation/screenshotocrpresentation.h"
 #include "snow_shot/presentation/screenshotrecognitionsessioncontroller.h"
 #include "snow_shot/presentation/screenshotrecognitionwindow.h"
+#include "snow_shot/presentation/screenshottextresultwindow.h"
 #include "snow_shot/presentation/screenshotoverlaycoordinator.h"
 #include "snow_shot/presentation/screenshotoverlaywindow.h"
 #include "snow_shot/presentation/screenshotselectionmodel.h"
@@ -21,6 +22,12 @@
 #include "snow_shot/presentation/screenshotcursorimagesource.h"
 #include "snow_shot/presentation/screenshottableeditor.h"
 #include "snow_shot/presentation/screenshottoolbarwindow.h"
+
+#include "snow_shot/ocrtextoptions.h"
+#include "snow_shot/storage/settingsadapters.h"
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+#include "snow_shot/translation/translationlanguages.h"
+#endif
 
 #include "theme/theme_manager.h"
 
@@ -31,8 +38,15 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
+#include <QGuiApplication>
 #include <QMimeData>
 #include <QScreen>
+#include <QStandardPaths>
+#include <QStringConverter>
+#include <QTextStream>
 #include <QTimer>
 #include <QUrl>
 
@@ -178,6 +192,8 @@ ScreenshotOcrController::ScreenshotOcrController(ScreenshotOcrControllerContext 
                     m_context.interaction.activeTool() != ScreenshotActiveTool::TextTranslation) {
                     m_context.interaction.setCanvasTool(ScreenshotActiveTool::TextTranslation);
                 }
+                if (m_textResultWindow != nullptr)
+                    m_textResultWindow->setTranslating(translating, streaming);
                 if (ScreenshotToolbarWindow* toolbar = m_context.overlayCoordinator.toolbar()) {
                     toolbar->setTextTranslationState(available, translating, streaming, canUndo,
                                                      canRedo, canReset, originalImage);
@@ -191,6 +207,8 @@ ScreenshotOcrController::ScreenshotOcrController(ScreenshotOcrControllerContext 
                 }
             },
             [this](bool textBusy, bool tableBusy, bool qrBusy) {
+                if (m_textResultWindow != nullptr)
+                    m_textResultWindow->setRecognizing(textBusy);
                 if (ScreenshotToolbarWindow* toolbar = m_context.overlayCoordinator.toolbar()) {
                     toolbar->setOcrBusy(textBusy);
                     toolbar->setTableBusy(tableBusy);
@@ -203,7 +221,15 @@ ScreenshotOcrController::ScreenshotOcrController(ScreenshotOcrControllerContext 
                 }
             },
             [this]() { m_messages->destroy(QString::fromLatin1(kRecognitionMessageKey)); },
-            [this](const QString& message, bool error) { showStatus(message, error); },
+            [this](const QString& message, bool error) {
+                if (error && m_textResultWindow != nullptr && m_active && m_mode == Mode::Text) {
+                    if (m_session->translating())
+                        m_textResultWindow->setTranslationStatus(message, true);
+                    else
+                        m_textResultWindow->setOcrStatus(message, true);
+                }
+                showStatus(message, error);
+            },
             [this]() -> QWidget* {
                 const QRectF selection = m_context.selection.normalizedSelection();
                 const CapturedDisplayModel* display = m_context.geometry.displayForCanvasPoint(
@@ -313,6 +339,9 @@ ScreenshotOcrController::ScreenshotOcrController(ScreenshotOcrControllerContext 
             },
         },
         this);
+    // Text and translation results are rendered by the standalone result window, never by an
+    // editor handed to the capture overlay.
+    m_session->setExternalTextResultHost(true);
     connect(m_session.get(), &ScreenshotRecognitionSessionController::textEditingChanged, this,
             &ScreenshotOcrController::textEditingChanged);
     connect(m_session.get(), &ScreenshotRecognitionSessionController::textResultChanged, this,
@@ -329,10 +358,37 @@ ScreenshotOcrController::ScreenshotOcrController(ScreenshotOcrControllerContext 
                     }
                     return;
                 }
+                if (m_active && m_mode == Mode::Text) {
+                    if (available) {
+                        if (!m_textResultElapsedMs.has_value() && m_textResultTimer.isValid())
+                            m_textResultElapsedMs = m_textResultTimer.elapsed();
+                        // Follow-ups that end the capture would only flash a window that the
+                        // session tears down immediately.
+                        const QString followUp = snow_shot::storage::ScreenshotSettings()
+                                                     .autoExecuteAfterTextRecognition();
+                        const bool endsCapture =
+                            followUp == QStringLiteral("copy_text_and_end_screenshot") ||
+                            followUp == QStringLiteral("quick_copy_text_and_end_screenshot");
+                        if (!endsCapture)
+                            presentTextResultWindow();
+                    } else if (m_textResultWindow != nullptr) {
+                        m_textResultWindow->setOcrText(QString());
+                        m_textResultWindow->clearTranslationResult();
+                    }
+                }
                 emit textResultChanged(available);
             });
     connect(m_session.get(), &ScreenshotRecognitionSessionController::textDraftChanged, this,
             &ScreenshotOcrController::textDraftChanged);
+    connect(m_session.get(), &ScreenshotRecognitionSessionController::textDraftChanged, this,
+            [this](const QString& draft) {
+                if (m_textResultWindow == nullptr || !m_active || m_mode != Mode::Text)
+                    return;
+                if (m_session->translating())
+                    m_textResultWindow->setTranslationText(draft);
+                else
+                    m_textResultWindow->setOcrText(draft);
+            });
     connect(m_session.get(), &ScreenshotRecognitionSessionController::workflowStateChanged, this,
             &ScreenshotOcrController::workflowStateChanged);
     connect(m_session.get(), &ScreenshotRecognitionSessionController::recognitionResultsChanged,
@@ -542,6 +598,23 @@ void ScreenshotOcrController::activateMode(Mode mode, bool textTranslation,
         key, std::move(source), QRectF(selection),
         key == m_importedTargetKey ? m_importedFormattedDocument : nullptr,
         key == m_importedTargetKey ? m_importedPlainText : QString()});
+    if (mode == Mode::Text) {
+        m_textResultElapsedMs.reset();
+        m_textResultTimer.start();
+        const snow_shot::storage::TextRecognitionSettings settings;
+        m_typesetting = settings.defaultFormatting();
+        if (m_typesetting.isEmpty())
+            m_typesetting = QStringLiteral("none");
+        if (m_textResultWindow != nullptr) {
+            m_textResultWindow->setOcrText(QString());
+            m_textResultWindow->clearTranslationResult();
+            m_textResultWindow->setOcrStatus(QString(), false);
+            m_textResultWindow->setElapsedMilliseconds(std::nullopt);
+            m_textResultWindow->setTranslating(false, false);
+        }
+    } else {
+        closeTextResultWindow();
+    }
     m_session->activate(static_cast<ScreenshotRecognitionSessionController::Mode>(mode));
 }
 
@@ -744,6 +817,7 @@ void ScreenshotOcrController::deactivateImpl(bool preserveRecognitionWindow) {
     }
     m_active = false;
     clearOcrBackgroundFromOverlays();
+    closeTextResultWindow();
     if (!preserveRecognitionWindow) {
         destroyRecognitionWindow();
     }
@@ -978,6 +1052,182 @@ void ScreenshotOcrController::destroyRecognitionWindow() {
     }
     m_surfaceKey.clear();
     m_surfaceImage = QImage();
+}
+
+namespace {
+QString resultWindowText(const char* source) {
+    return QCoreApplication::translate("ScreenshotTextResultWindow",
+                                       source);
+}
+
+void saveResultTextToFile(QWidget* owner, const QString& text, const QString& suggestedName) {
+    if (text.isEmpty())
+        return;
+    const QString directory =
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString path = QFileDialog::getSaveFileName(
+        owner, resultWindowText(QT_TRANSLATE_NOOP(
+                   "ScreenshotTextResultWindow", "Save Text")),
+        QDir(directory).filePath(suggestedName),
+        resultWindowText(QT_TRANSLATE_NOOP(
+            "ScreenshotTextResultWindow", "Text files (*.txt)")));
+    if (path.isEmpty())
+        return;
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+        return;
+    QTextStream stream(&file);
+    stream.setEncoding(QStringConverter::Utf8);
+    stream << text;
+}
+} // namespace
+
+void ScreenshotOcrController::ensureTextResultWindow() {
+    if (m_textResultWindow != nullptr)
+        return;
+    using snow_shot::presentation::ScreenshotTextResultWindow;
+    auto* window = new ScreenshotTextResultWindow(this);
+    m_textResultWindow = window;
+
+    connect(window, &ScreenshotTextResultWindow::closed, this, [this] {
+        // A user close ends the recognition presentation; a programmatic close during
+        // deactivation finds the controller already inactive. Defer so the modal can finish
+        // unwinding its own close path before the surface it owns is destroyed.
+        const quint64 activation = m_activationId;
+        QTimer::singleShot(0, this, [this, activation] {
+            if (activation != m_activationId || !m_active || m_mode != Mode::Text)
+                return;
+            deactivate();
+            // The capture overlay is hidden while the result surface is up, so closing the
+            // surface has to end the capture; otherwise it would linger invisibly.
+            m_context.cancelCapture();
+        });
+    });
+    connect(window, &ScreenshotTextResultWindow::recognizeRequested, this, [this] {
+        m_textResultElapsedMs.reset();
+        m_textResultTimer.restart();
+        if (m_textResultWindow != nullptr) {
+            m_textResultWindow->setElapsedMilliseconds(std::nullopt);
+            m_textResultWindow->setOcrText(QString());
+            m_textResultWindow->setOcrStatus(QString(), false);
+            m_textResultWindow->clearTranslationResult();
+        }
+        m_session->reRecognizeText();
+    });
+    connect(window, &ScreenshotTextResultWindow::translateRequested, this,
+            [this](const QString& source, const QString& target) {
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+                if (!source.isEmpty())
+                    m_session->applyTextSourceLanguage(source);
+                if (!target.isEmpty())
+                    m_session->applyTextTargetLanguage(target);
+                if (m_textResultWindow != nullptr) {
+                    m_textResultWindow->setTranslationStatus(QString(), false);
+                    m_textResultWindow->clearTranslationResult();
+                }
+                m_session->beginTextTranslation();
+#else
+                Q_UNUSED(source)
+                Q_UNUSED(target)
+#endif
+            });
+    connect(window, &ScreenshotTextResultWindow::typesettingChanged, this,
+            [this](const QString& value) {
+                m_typesetting = value;
+                m_session->applyTextFormatting(value);
+            });
+    connect(window, &ScreenshotTextResultWindow::copyImageRequested, this, [this] {
+        if (m_textResultWindow == nullptr || QApplication::clipboard() == nullptr)
+            return;
+        const QImage image = m_textResultWindow->previewImage();
+        if (image.isNull())
+            return;
+        QApplication::clipboard()->setImage(image);
+    });
+    connect(window, &ScreenshotTextResultWindow::saveOcrRequested, this, [this] {
+        if (m_textResultWindow == nullptr)
+            return;
+        saveResultTextToFile(m_textResultWindow->windowWidget(),
+                             m_textResultWindow->ocrText(),
+                             QStringLiteral("recognized-text.txt"));
+    });
+    connect(window, &ScreenshotTextResultWindow::saveTranslationRequested, this, [this] {
+        if (m_textResultWindow == nullptr)
+            return;
+        saveResultTextToFile(m_textResultWindow->windowWidget(),
+                             m_textResultWindow->translationText(),
+                             QStringLiteral("translation.txt"));
+    });
+    connect(window, &ScreenshotTextResultWindow::translationSettingsRequested, this,
+            [this] { openTranslationSettings(); });
+}
+
+QString ScreenshotOcrController::currentResultText() const {
+    if (!m_session->hasTextResult())
+        return {};
+    return m_session->textDraft();
+}
+
+void ScreenshotOcrController::refreshTextResultOcrText() {
+    if (m_textResultWindow == nullptr)
+        return;
+    m_textResultWindow->setOcrText(currentResultText());
+}
+
+void ScreenshotOcrController::presentTextResultWindow() {
+    if (!m_active || m_mode != Mode::Text || m_context.captureState.presentationSuppressed)
+        return;
+    ensureTextResultWindow();
+    if (m_textResultWindow == nullptr)
+        return;
+    m_textResultWindow->setElapsedMilliseconds(m_textResultElapsedMs);
+
+    QVector<snow_shot::presentation::ScreenshotTextResultOption> typesetting;
+    for (const auto& option : snow_shot::ocrFormattingOptions())
+        typesetting.append({option.value, QCoreApplication::translate("OcrTextOptions",
+                                                                      option.label)});
+    m_textResultWindow->setTypesettingOptions(typesetting, m_typesetting);
+    m_textResultWindow->setTranslationAvailable(snow_shot::app::edition::textTranslation);
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+    QVector<snow_shot::presentation::ScreenshotTextResultOption> sources{
+        {QStringLiteral("auto"),
+         snow_shot::translation::translationLanguageName(QStringLiteral("auto"))}};
+    QVector<snow_shot::presentation::ScreenshotTextResultOption> targets;
+    for (const auto& language : snow_shot::translation::translationLanguages()) {
+        const QString code = QString::fromLatin1(language.code);
+        const QString name = snow_shot::translation::translationLanguageName(code);
+        sources.append({code, name});
+        targets.append({code, name});
+    }
+    m_textResultWindow->setLanguages(sources, m_session->translationSourceLanguage(), targets,
+                                     m_session->translationTargetLanguage());
+#endif
+    refreshTextResultOcrText();
+
+    const QRectF selection = m_context.selection.normalizedSelection();
+    const CapturedDisplayModel* display =
+        m_context.geometry.displayForCanvasPoint(m_context.displaySession, selection.center());
+    if (display == nullptr)
+        display = m_context.geometry.displayForCanvasRect(m_context.displaySession, selection);
+    QScreen* screen = nullptr;
+    if (display != nullptr) {
+        screen = ScreenshotGeometryMapper::screenForCaptureDisplay(display->name,
+                                                                   display->physicalRect);
+    }
+    if (screen == nullptr)
+        screen = QGuiApplication::primaryScreen();
+
+    m_textResultWindow->present(screen, m_surfaceImage);
+    // The detached surface replaces the capture UI, so the overlay and its toolbar step aside.
+    // The capture session itself stays alive: "recognize again" and the image copy still depend
+    // on the selection and the cached target.
+    m_context.hideCapturePresentation();
+}
+
+void ScreenshotOcrController::closeTextResultWindow() {
+    if (m_textResultWindow == nullptr)
+        return;
+    m_textResultWindow->close();
 }
 
 void ScreenshotOcrController::showStatus(const QString& message, bool error) const {

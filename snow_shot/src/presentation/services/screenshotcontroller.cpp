@@ -1343,6 +1343,7 @@ bool ScreenshotController::Impl::ensureRecognitionFeature() {
                 }
             },
             m_windowShortcutManager.get(),
+            [this]() { hideCapturePresentationImmediately(); },
         },
         &owner);
     QObject::connect(m_ocrController.get(), &ScreenshotOcrController::textResultChanged, &owner,

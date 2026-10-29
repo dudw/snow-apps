@@ -2431,9 +2431,13 @@ void AdModal::ensureOverlay() {
   footerButtonsLayout->addWidget(acceptButton);
   footerLayout->addWidget(footerButtonsHost);
 
-  panelLayout->addWidget(header);
-  panelLayout->addWidget(body);
-  panelLayout->addWidget(footer);
+  // Only the body absorbs leftover height: the header and footer keep their hint height even
+  // when the content area reports a dense minimum size.
+  header->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+  footer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+  panelLayout->addWidget(header, 0);
+  panelLayout->addWidget(body, 1);
+  panelLayout->addWidget(footer, 0);
 
   overlayLayout->addWidget(panel, 0, Qt::AlignTop | Qt::AlignHCenter);
   if (windowMode) {
@@ -3168,6 +3172,11 @@ void AdModal::applyVisualStyle() {
 
   if (titleLabel_) {
     titleLabel_->setFont(style.titleFont);
+    // A wrapped label reports a height-for-width hint, so a content area that demands more
+    // width than the panel can provide collapses the title to a few characters per line and
+    // inflates the header to hundreds of pixels. Detached windows carry a single-line title,
+    // exactly like a native title bar.
+    titleLabel_->setWordWrap(!usesWindowSurface());
     QPalette palette = titleLabel_->palette();
     palette.setColor(QPalette::WindowText, style.titleColor);
     titleLabel_->setPalette(palette);

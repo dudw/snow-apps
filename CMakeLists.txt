@@ -139,6 +139,14 @@ set(SNOW_RUST_CARGO_TARGET_DIR
 set(SNOW_RUST_RELEASE_PROFILE "release" CACHE STRING
     "Cargo profile used for non-Debug Rust builds.")
 
+# Visual Studio 2026 runs a C++ module dependency scan before every compile, and
+# that task aborts with MSB6001 ("Path"/"path" duplicate key while building
+# ProcessStartInfo.EnvironmentVariables). No target declares C++20 module
+# sources, so keep the scan disabled; pass -DCMAKE_CXX_SCAN_FOR_MODULES=ON to
+# re-enable it.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF CACHE BOOL
+    "Scan C++ sources for module dependencies")
+
 snow_workspace_configure_paths()
 # Resolve imported metadata before configuring codecs, CRT linkage, or creating
 # any workspace targets. Subprojects also use this contract when built alone.

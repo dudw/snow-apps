@@ -459,6 +459,14 @@ void ScreenshotRecognitionSessionController::setIndependentEditing(bool enabled)
     updateOriginalImagePreview();
 }
 
+void ScreenshotRecognitionSessionController::setExternalTextResultHost(bool enabled) {
+    m_externalTextResultHost = enabled;
+}
+
+bool ScreenshotRecognitionSessionController::externalTextResultHost() const {
+    return m_externalTextResultHost;
+}
+
 void ScreenshotRecognitionSessionController::setTarget(ScreenshotRecognitionTarget target) {
     if (target.key == m_target.key && target.canvasRect == m_target.canvasRect &&
         target.formattedTextDocument == m_target.formattedTextDocument &&
@@ -1168,6 +1176,44 @@ void ScreenshotRecognitionSessionController::retryRecognition() {
     if (!notify(&ScreenshotRecognitionSessionController::loadRecognitionModels, refresh))
         return;
     notify(&ScreenshotRecognitionSessionController::activateModelResult);
+}
+
+void ScreenshotRecognitionSessionController::reRecognizeText() {
+    if (!m_active || m_mode != Mode::Text || m_textRequestToken != 0 || !hasTarget())
+        return;
+    const QPointer<ScreenshotRecognitionSessionController> lifetime(this);
+    const QString key = m_textCacheKey.isEmpty() ? m_target.key : m_textCacheKey;
+    auto entry = m_textCache.find(key);
+    if (entry != m_textCache.end()) {
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+        if (entry->translationJob != nullptr) {
+            entry->translationJob->cancel();
+            entry->translationJob->deleteLater();
+            entry->translationJob = nullptr;
+        }
+#endif
+        m_textCache.erase(entry);
+    }
+    m_textCacheKey.clear();
+    if (!notify(&ScreenshotRecognitionSessionController::clearTextEditingState))
+        return;
+    m_presentation.reset();
+    if (ScreenshotRecognitionWindow* window = content())
+        window->clearOcrPresentation();
+    if (m_actions.clearOcrBackground) {
+        if (!notifyCallback(m_actions.clearOcrBackground))
+            return;
+    }
+    if (!notify(&ScreenshotRecognitionSessionController::textResultChanged, false))
+        return;
+    if (!notify(&ScreenshotRecognitionSessionController::startTextRecognition,
+                ScreenshotOcrRequestPriority::Interactive))
+        return;
+    if (!updateBusyState())
+        return;
+    if (!updateTextState())
+        return;
+    notify(&ScreenshotRecognitionSessionController::recognitionResultsChanged);
 }
 
 void ScreenshotRecognitionSessionController::activateModelResult() {
@@ -1901,7 +1947,7 @@ void ScreenshotRecognitionSessionController::beginTextEditing() {
         if (it->editingSession)
             documentOwner = {it->editingSession, m_textDocument.data()};
     }
-    if (content() != nullptr && m_textDocument != nullptr) {
+    if (content() != nullptr && m_textDocument != nullptr && !m_externalTextResultHost) {
         if (m_actions.clearOcrBackground) {
             if (!notifyCallback(m_actions.clearOcrBackground))
                 return;
@@ -1942,7 +1988,7 @@ void ScreenshotRecognitionSessionController::beginTextTranslation() {
     }
     it->editing = false;
     const snow_shot::storage::ScreenshotTranslationSettings settings;
-    const bool originalImage = !m_independentEditing &&
+    const bool originalImage = !m_independentEditing && !m_externalTextResultHost &&
                                settings.originalImageTranslationEnabled() && !it->formatted &&
                                it->presentation != nullptr;
     if (originalImage != m_translationInImage) {
@@ -1985,7 +2031,7 @@ void ScreenshotRecognitionSessionController::beginTextTranslation() {
     m_textDocument = it->translationSession->document();
     const std::shared_ptr<QTextDocument> documentOwner(it->translationSession,
                                                        m_textDocument.data());
-    if (content() != nullptr) {
+    if (content() != nullptr && !m_externalTextResultHost) {
         if (m_actions.clearOcrBackground) {
             if (!notifyCallback(m_actions.clearOcrBackground))
                 return;
@@ -2009,7 +2055,7 @@ void ScreenshotRecognitionSessionController::beginTextTranslation() {
 
 bool ScreenshotRecognitionSessionController::activateCachedTextTranslation() {
 #if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
-    if (!m_active || m_mode != Mode::Text || m_independentEditing) {
+    if (!m_active || m_mode != Mode::Text || m_independentEditing || m_externalTextResultHost) {
         return false;
     }
     auto entry = m_textCache.find(m_target.key);
@@ -2155,6 +2201,35 @@ void ScreenshotRecognitionSessionController::applyTextTargetLanguage(const QStri
     Q_UNUSED(language);
 #endif
 }
+
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+QString ScreenshotRecognitionSessionController::translationSourceLanguage() const {
+    if (m_translationService == nullptr)
+        return {};
+    return m_translationService->preferences().sourceLanguage;
+}
+
+QString ScreenshotRecognitionSessionController::translationTargetLanguage() const {
+    if (m_translationService == nullptr)
+        return {};
+    return m_translationService->preferences().targetLanguage;
+}
+
+void ScreenshotRecognitionSessionController::applyTextSourceLanguage(const QString& language) {
+    const QPointer<ScreenshotRecognitionSessionController> lifetime(this);
+    if (m_translationService == nullptr)
+        return;
+    auto preferences = m_translationService->preferences();
+    if (preferences.sourceLanguage == language)
+        return;
+    preferences.sourceLanguage = language;
+    const bool saved = m_translationService->savePreferences(preferences);
+    if (!lifetime || !m_translationService)
+        return;
+    if (!saved)
+        static_cast<void>(showStatus(m_translationService->errorText(), true));
+}
+#endif
 
 void ScreenshotRecognitionSessionController::openTranslationSettings() {
 #if SNOW_SHOT_ENABLE_TEXT_TRANSLATION

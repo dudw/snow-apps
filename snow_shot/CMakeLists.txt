@@ -388,6 +388,9 @@ snow_add_rust_executable(snow_ocr_process
     OUTPUT_NAME snow-ocr-process
     PERFORMANCE_PROFILE
     REPRODUCIBLE
+    # The crash-diagnostics payload links crashpad, which is always built with
+    # the static CRT, and this process never shares the app's Qt runtime.
+    STATIC_CRT
     TOOLCHAIN "${SNOW_SHOT_OCR_TOOLCHAIN}"
     FEATURES ${SNOW_SHOT_OCR_PROCESS_FEATURES}
     ENVIRONMENT ${SNOW_SHOT_OCR_PROCESS_ENVIRONMENT}
@@ -1951,6 +1954,8 @@ set(PROJECT_CXX_SOURCES
     src/presentation/ocr/screenshotrecognitionsessioncontroller.cpp
     src/presentation/ocr/screenshotocrlayout.cpp
     src/presentation/ocr/screenshotrecognitionwindow.cpp
+    src/presentation/ocr/screenshottextresultwindow.cpp
+    include/snow_shot/presentation/screenshottextresultwindow.h
     src/presentation/ocr/screenshottabledocument.cpp
     src/presentation/ocr/screenshottableeditor.cpp
     src/presentation/ocr/screenshotocrtexttransform.cpp
@@ -9006,7 +9011,9 @@ if(SNOW_SHOT_BUILD_TESTS)
     add_executable(snow-shot-translation-tool-tests ${_translation_tool_sources}
         tests/screenshot_translation_tool_tests.cpp
         include/snow_shot/presentation/screenshotocrcontroller.h
-        src/presentation/ocr/screenshotocrcontroller.cpp)
+        include/snow_shot/presentation/screenshottextresultwindow.h
+        src/presentation/ocr/screenshotocrcontroller.cpp
+        src/presentation/ocr/screenshottextresultwindow.cpp)
     target_include_directories(snow-shot-translation-tool-tests PRIVATE include src/image)
     target_link_libraries(snow-shot-translation-tool-tests PRIVATE snow_shot_translation
         snow_shot_diagnostics snow_shot_storage snow_shot_image_codec snow_shot_window_shortcuts
@@ -9023,6 +9030,30 @@ if(SNOW_SHOT_BUILD_TESTS)
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
     unset(_translation_tool_sources)
     unset(_translation_session_sources)
+    add_executable(snow-shot-text-result-window-tests
+        tests/screenshot_text_result_window_tests.cpp
+        include/snow_shot/presentation/screenshottextresultwindow.h
+        src/presentation/ocr/screenshottextresultwindow.cpp
+    )
+    target_include_directories(snow-shot-text-result-window-tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_link_libraries(snow-shot-text-result-window-tests PRIVATE
+        snow_shot_settings
+        snow_shot_window_shortcuts
+        ant_design_qt
+        adqt_icon_core
+        ant_design_icons_qt
+        Qt6::Widgets
+    )
+    snow_shot_add_translations(snow-shot-text-result-window-tests)
+    snow_shot_import_offscreen_platform(snow-shot-text-result-window-tests)
+    add_test(NAME snow-shot-text-result-window-tests
+        COMMAND snow-shot-text-result-window-tests -platform offscreen)
+    set_tests_properties(snow-shot-text-result-window-tests PROPERTIES
+        LABELS "unit" TIMEOUT 60
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+
     get_target_property(_snow_mcp_document_sources snow-shot-recognition-session-controller-tests SOURCES)
     list(REMOVE_ITEM _snow_mcp_document_sources
         tests/screenshot_recognition_session_controller_tests.cpp

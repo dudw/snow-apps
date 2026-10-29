@@ -60,8 +60,11 @@ function(snow_default_rust_libclang_directory output)
     elseif(WIN32)
         snow_windows_rust_host_architecture(_host)
         set(_directory "${SNOW_VCPKG_ROOT}/../llvm-${_host}/bin")
+        # Visual Studio 2026 ships LLVM under Tools/Llvm/<architecture>/bin
+        # instead of the single Tools/Llvm/bin layout of earlier releases.
         foreach(_candidate IN ITEMS "${_directory}" "${SNOW_VCPKG_ROOT}/../llvm/bin"
-            "$ENV{LLVMInstallDir}/bin" "$ENV{VCINSTALLDIR}/Tools/Llvm/ARM64/bin"
+            "$ENV{LLVMInstallDir}/bin" "$ENV{VCINSTALLDIR}/Tools/Llvm/${_host}/bin"
+            "$ENV{VCINSTALLDIR}/Tools/Llvm/ARM64/bin"
             "$ENV{VCINSTALLDIR}/Tools/Llvm/bin" "C:/Program Files/LLVM/bin")
             if(EXISTS "${_candidate}/libclang.dll")
                 _snow_libclang_pe_architecture(_machine "${_candidate}/libclang.dll")

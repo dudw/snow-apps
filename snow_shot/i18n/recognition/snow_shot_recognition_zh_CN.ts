@@ -418,4 +418,95 @@
             <translation>粘贴的单元格超出识别表格范围</translation>
         </message>
     </context>
+    <context>
+        <name>ScreenshotTextResultWindow</name>
+        <message>
+            <source>Copy image</source>
+            <translation>复制图片</translation>
+        </message>
+        <message>
+            <source>Copy recognized text</source>
+            <translation>复制识别文本</translation>
+        </message>
+        <message>
+            <source>Copy translation</source>
+            <translation>复制译文</translation>
+        </message>
+        <message>
+            <source>Elapsed: %1 s</source>
+            <translation>耗时：%1 秒</translation>
+        </message>
+        <message>
+            <source>More Settings</source>
+            <translation>其他设置</translation>
+        </message>
+        <message>
+            <source>Preview</source>
+            <translation>预览</translation>
+        </message>
+        <message>
+            <source>Recognize Again</source>
+            <translation>重新识别</translation>
+        </message>
+        <message>
+            <source>Recognized Text</source>
+            <translation>OCR 结果</translation>
+        </message>
+        <message>
+            <source>Recognized text appears here</source>
+            <translation>识别结果将显示在这里</translation>
+        </message>
+        <message>
+            <source>Save Text</source>
+            <translation>保存文本</translation>
+        </message>
+        <message>
+            <source>Save recognized text</source>
+            <translation>保存识别文本</translation>
+        </message>
+        <message>
+            <source>Save translation</source>
+            <translation>保存译文</translation>
+        </message>
+        <message>
+            <source>Settings</source>
+            <translation>设置</translation>
+        </message>
+        <message>
+            <source>Source Language</source>
+            <translation>翻译源语言</translation>
+        </message>
+        <message>
+            <source>Target Language</source>
+            <translation>翻译目标语言</translation>
+        </message>
+        <message>
+            <source>Text Recognition</source>
+            <translation>文本识别</translation>
+        </message>
+        <message>
+            <source>Text files (*.txt)</source>
+            <translation>文本文件 (*.txt)</translation>
+        </message>
+        <message>
+            <source>Time from the recognition request to the result</source>
+            <translation>从发起识别到返回结果的耗时</translation>
+        </message>
+        <message>
+            <source>Translate</source>
+            <translation>翻译</translation>
+        </message>
+        <message>
+            <source>Translation</source>
+            <translation>翻译</translation>
+        </message>
+        <message>
+            <source>Translation appears here</source>
+            <translation>译文将显示在这里</translation>
+        </message>
+        <message>
+            <source>Typesetting</source>
+            <translation>排版</translation>
+        </message>
+    </context>
 </TS>

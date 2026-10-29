@@ -243,9 +243,20 @@ $null = Invoke-Checked -Command $cargo.Source -Arguments @(
     "metadata", "--format-version", "1", "--no-deps"
 ) -WorkingDirectory (Join-Path $repoRoot "snow_draw_engine_qt")
 
-$libclangDirectory = Join-Path $toolsRoot "llvm\bin"
-if (-not (Test-Path -LiteralPath (Join-Path $libclangDirectory "libclang.dll"))) {
-    Write-Warning "libclang.dll was not found under $libclangDirectory; Rust bindgen builds may fail."
+$libclangCandidates = @(@(
+    $env:LIBCLANG_PATH,
+    (Join-Path $toolsRoot "llvm-$($rustToolchain.Architecture)\bin"),
+    (Join-Path $toolsRoot "llvm\bin"),
+    (Join-Path $env:VCINSTALLDIR "Tools/Llvm/$($rustToolchain.Architecture)/bin"),
+    (Join-Path $env:VCINSTALLDIR "Tools/Llvm/ARM64/bin"),
+    (Join-Path $env:VCINSTALLDIR "Tools/Llvm/bin")
+) | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ "libclang.dll") -PathType Leaf) })
+if ($libclangCandidates.Count -gt 0) {
+    $env:LIBCLANG_PATH = $libclangCandidates[0]
+}
+else {
+    Write-Warning ("libclang.dll was not found; Rust bindgen builds may fail. " +
+        "Install the Visual Studio C++ Clang tools component or set LIBCLANG_PATH.")
 }
 
 Write-Host "Snow Apps build environment is ready."

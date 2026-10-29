@@ -418,4 +418,95 @@
             <translation>貼上的儲存格超出辨識表格範圍</translation>
         </message>
     </context>
+    <context>
+        <name>ScreenshotTextResultWindow</name>
+        <message>
+            <source>Copy image</source>
+            <translation>複製圖片</translation>
+        </message>
+        <message>
+            <source>Copy recognized text</source>
+            <translation>複製識別文字</translation>
+        </message>
+        <message>
+            <source>Copy translation</source>
+            <translation>複製譯文</translation>
+        </message>
+        <message>
+            <source>Elapsed: %1 s</source>
+            <translation>耗時：%1 秒</translation>
+        </message>
+        <message>
+            <source>More Settings</source>
+            <translation>其他設定</translation>
+        </message>
+        <message>
+            <source>Preview</source>
+            <translation>預覽</translation>
+        </message>
+        <message>
+            <source>Recognize Again</source>
+            <translation>重新識別</translation>
+        </message>
+        <message>
+            <source>Recognized Text</source>
+            <translation>OCR 結果</translation>
+        </message>
+        <message>
+            <source>Recognized text appears here</source>
+            <translation>識別結果將顯示在這裡</translation>
+        </message>
+        <message>
+            <source>Save Text</source>
+            <translation>儲存文字</translation>
+        </message>
+        <message>
+            <source>Save recognized text</source>
+            <translation>儲存識別文字</translation>
+        </message>
+        <message>
+            <source>Save translation</source>
+            <translation>儲存譯文</translation>
+        </message>
+        <message>
+            <source>Settings</source>
+            <translation>設定</translation>
+        </message>
+        <message>
+            <source>Source Language</source>
+            <translation>翻譯來源語言</translation>
+        </message>
+        <message>
+            <source>Target Language</source>
+            <translation>翻譯目標語言</translation>
+        </message>
+        <message>
+            <source>Text Recognition</source>
+            <translation>文本識別</translation>
+        </message>
+        <message>
+            <source>Text files (*.txt)</source>
+            <translation>文字檔案 (*.txt)</translation>
+        </message>
+        <message>
+            <source>Time from the recognition request to the result</source>
+            <translation>從發起識別到傳回結果的耗時</translation>
+        </message>
+        <message>
+            <source>Translate</source>
+            <translation>翻譯</translation>
+        </message>
+        <message>
+            <source>Translation</source>
+            <translation>翻譯</translation>
+        </message>
+        <message>
+            <source>Translation appears here</source>
+            <translation>譯文將顯示在這裡</translation>
+        </message>
+        <message>
+            <source>Typesetting</source>
+            <translation>排版</translation>
+        </message>
+    </context>
 </TS>

@@ -418,4 +418,95 @@
             <translation>The pasted cells do not fit inside the recognized table</translation>
         </message>
     </context>
+    <context>
+        <name>ScreenshotTextResultWindow</name>
+        <message>
+            <source>Copy image</source>
+            <translation>Copy image</translation>
+        </message>
+        <message>
+            <source>Copy recognized text</source>
+            <translation>Copy recognized text</translation>
+        </message>
+        <message>
+            <source>Copy translation</source>
+            <translation>Copy translation</translation>
+        </message>
+        <message>
+            <source>Elapsed: %1 s</source>
+            <translation>Elapsed: %1 s</translation>
+        </message>
+        <message>
+            <source>More Settings</source>
+            <translation>More Settings</translation>
+        </message>
+        <message>
+            <source>Preview</source>
+            <translation>Preview</translation>
+        </message>
+        <message>
+            <source>Recognize Again</source>
+            <translation>Recognize Again</translation>
+        </message>
+        <message>
+            <source>Recognized Text</source>
+            <translation>Recognized Text</translation>
+        </message>
+        <message>
+            <source>Recognized text appears here</source>
+            <translation>Recognized text appears here</translation>
+        </message>
+        <message>
+            <source>Save Text</source>
+            <translation>Save Text</translation>
+        </message>
+        <message>
+            <source>Save recognized text</source>
+            <translation>Save recognized text</translation>
+        </message>
+        <message>
+            <source>Save translation</source>
+            <translation>Save translation</translation>
+        </message>
+        <message>
+            <source>Settings</source>
+            <translation>Settings</translation>
+        </message>
+        <message>
+            <source>Source Language</source>
+            <translation>Source Language</translation>
+        </message>
+        <message>
+            <source>Target Language</source>
+            <translation>Target Language</translation>
+        </message>
+        <message>
+            <source>Text Recognition</source>
+            <translation>Text Recognition</translation>
+        </message>
+        <message>
+            <source>Text files (*.txt)</source>
+            <translation>Text files (*.txt)</translation>
+        </message>
+        <message>
+            <source>Time from the recognition request to the result</source>
+            <translation>Time from the recognition request to the result</translation>
+        </message>
+        <message>
+            <source>Translate</source>
+            <translation>Translate</translation>
+        </message>
+        <message>
+            <source>Translation</source>
+            <translation>Translation</translation>
+        </message>
+        <message>
+            <source>Translation appears here</source>
+            <translation>Translation appears here</translation>
+        </message>
+        <message>
+            <source>Typesetting</source>
+            <translation>Typesetting</translation>
+        </message>
+    </context>
 </TS>
