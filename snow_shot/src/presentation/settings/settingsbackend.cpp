@@ -875,6 +875,11 @@ bool BuiltInSettingsBackend::applySelectValue(SettingsSelectBinding binding,
 
 bool BuiltInSettingsBackend::switchValue(SettingsSwitchBinding binding) const {
     switch (binding) {
+    case SettingsSwitchBinding::OcrHardwareAcceleration:
+        return storage::ApplicationStorage::instance()
+            .configuration()
+            .value(QStringLiteral("text_recognition/hardware_acceleration"))
+            .toBool();
     case SettingsSwitchBinding::HistoryEnabled:
         return storage::ApplicationStorage::instance().captureHistoryPolicy().enabled;
     case SettingsSwitchBinding::PinnedHistoryEnabled:
@@ -905,6 +910,8 @@ bool BuiltInSettingsBackend::switchValue(SettingsSwitchBinding binding) const {
         return storage::FloatingToolbarSettings().enabled();
     case SettingsSwitchBinding::TrayEnabled:
         return storage::TraySettings().enabled();
+    case SettingsSwitchBinding::TrayUseSystemIconColor:
+        return storage::TraySettings().useSystemIconColor();
     case SettingsSwitchBinding::ScreenshotQuickSelectionModification:
         return storage::ScreenshotSettings().quickSelectionModification();
     case SettingsSwitchBinding::ScreenshotShowCursor:
@@ -1165,6 +1172,13 @@ bool BuiltInSettingsBackend::switchEnabled(SettingsSwitchBinding binding) const 
 }
 
 bool BuiltInSettingsBackend::applySwitchValue(SettingsSwitchBinding binding, bool value) {
+    if (binding == SettingsSwitchBinding::OcrHardwareAcceleration) {
+        const bool accepted = storage::ApplicationStorage::instance().configuration().setValue(
+            QStringLiteral("text_recognition/hardware_acceleration"), value);
+        if (accepted)
+            emit synchronized();
+        return accepted;
+    }
     if (binding == SettingsSwitchBinding::ScreenshotShowSaveResult)
         return switchEnabled(binding) && storage::ScreenshotSettings().setShowSaveResult(value);
     if (binding == SettingsSwitchBinding::OcrResidentProcess ||
@@ -1223,6 +1237,9 @@ bool BuiltInSettingsBackend::applySwitchValue(SettingsSwitchBinding binding, boo
         return storage::FloatingToolbarSettings().setEnabled(value);
     if (binding == SettingsSwitchBinding::TrayEnabled) {
         return storage::TraySettings().setEnabled(value);
+    }
+    if (binding == SettingsSwitchBinding::TrayUseSystemIconColor) {
+        return storage::TraySettings().setUseSystemIconColor(value);
     }
     if (binding == SettingsSwitchBinding::ScreenshotCopyImageFileToClipboard) {
         return storage::ScreenshotSettings().setCopyImageFileToClipboard(value);
@@ -1383,12 +1400,14 @@ bool BuiltInSettingsBackend::applySwitchValue(SettingsSwitchBinding binding, boo
         return false;
     case SettingsSwitchBinding::OcrResidentProcess:
     case SettingsSwitchBinding::OcrModelHotStart:
+    case SettingsSwitchBinding::OcrHardwareAcceleration:
         return false;
     case SettingsSwitchBinding::ScreenshotAreaTypeHint:
     case SettingsSwitchBinding::ShowGuidesByDefault:
     case SettingsSwitchBinding::ShowEditSelectionToolbar:
     case SettingsSwitchBinding::FloatingToolbarEnabled:
     case SettingsSwitchBinding::TrayEnabled:
+    case SettingsSwitchBinding::TrayUseSystemIconColor:
     case SettingsSwitchBinding::ScreenshotQuickSelectionModification:
     case SettingsSwitchBinding::ScreenshotShowCursor:
     case SettingsSwitchBinding::ScreenshotCaptureUiInScrollingScreenshot:
@@ -2356,7 +2375,7 @@ bool BuiltInSettingsBackend::importConfigurationSnapshot(
     const QString contextMenuKey = QStringLiteral("system/context_menu_mode");
 #endif
     const auto importedValue = [&](const QString& key) {
-        const auto fallback = storage::ConfigurationSchema::defaultValue(key);
+        const auto fallback = configuration.defaultValue(key);
         const auto normalized =
             storage::ConfigurationSchema::normalize(key, values.value(key, fallback));
         return normalized.valid ? normalized.value : fallback;
@@ -2991,15 +3010,13 @@ bool BuiltInSettingsBackend::resetSection(SettingsSectionReset reset) {
                 QStringLiteral("global_shortcuts/disable_on_focused_fullscreen_window"))
                 .toBool());
     case SettingsSectionReset::SystemGeneral: {
+        const auto& configuration = storage::ApplicationStorage::instance().configuration();
         if (app::distribution::isStoreManaged())
             return applySelectValue(SettingsSelectBinding::ContextMenuMode,
-                                    storage::ConfigurationSchema::defaultValue(
-                                        QStringLiteral("system/context_menu_mode"))
-                                        .toVariant());
+                                    configuration.defaultValue(kContextMenuModeKey).toVariant());
         emit synchronized();
         const auto result = applyStartupSettings(
-            storage::ConfigurationSchema::defaultValue(QStringLiteral("system/auto_start_at_boot"))
-                .toBool(),
+            configuration.defaultValue(QStringLiteral("system/auto_start_at_boot")).toBool(),
             false);
         if (!result.success)
             emit operationMessage(result.error, false);
@@ -3007,9 +3024,7 @@ bool BuiltInSettingsBackend::resetSection(SettingsSectionReset reset) {
         bool accepted = result.success;
 #ifdef Q_OS_WIN
         accepted = applySelectValue(SettingsSelectBinding::ContextMenuMode,
-                                    storage::ConfigurationSchema::defaultValue(
-                                        QStringLiteral("system/context_menu_mode"))
-                                        .toVariant()) &&
+                                    configuration.defaultValue(kContextMenuModeKey).toVariant()) &&
                    accepted;
 #endif
         return accepted && applySelectValue(SettingsSelectBinding::UpdateMode,
@@ -3083,8 +3098,11 @@ bool BuiltInSettingsBackend::resetSection(SettingsSectionReset reset) {
     case SettingsSectionReset::TextRecognition: {
         auto& storage = storage::ApplicationStorage::instance();
         const bool accepted = storage.configuration().setValues({
-            {QStringLiteral("text_recognition/resident_process"), false},
+            {QStringLiteral("text_recognition/resident_process"),
+             storage::ConfigurationSchema::defaultValue(
+                 QStringLiteral("text_recognition/resident_process"))},
             {QStringLiteral("text_recognition/model_hot_start"), false},
+            {QStringLiteral("text_recognition/hardware_acceleration"), false},
             {QStringLiteral("text_recognition/model_type"),
              storage::ConfigurationSchema::defaultValue(
                  QStringLiteral("text_recognition/model_type"))},

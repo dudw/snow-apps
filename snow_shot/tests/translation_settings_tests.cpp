@@ -702,16 +702,30 @@ int main(int argc, char** argv) {
         settings::SettingsRuntimeSession session(settings::builtInSettingsRegistry(), backend);
         const auto resident = settings::SettingsSwitchBinding::OcrResidentProcess;
         const auto hot = settings::SettingsSwitchBinding::OcrModelHotStart;
+        const auto acceleration = settings::SettingsSwitchBinding::OcrHardwareAcceleration;
+        const QString accelerationId = QStringLiteral("text-recognition.hardware-acceleration");
+        require(!backend.switchValue(acceleration) && session.state(accelerationId).enabled,
+                "hardware acceleration defaults off and remains available without a GPU probe");
+        require(backend.applySwitchValue(acceleration, true) &&
+                    applicationStorage.configuration()
+                        .value(QStringLiteral("text_recognition/hardware_acceleration"))
+                        .toBool(),
+                "hardware acceleration persists without preparing OCR resources");
+        QCoreApplication::processEvents();
+        require(session.state(accelerationId).acceptedValue.toBool() &&
+                    backend.switchValue(resident) && !backend.switchValue(hot),
+                "hardware acceleration is independent of residency and model hot start");
         const QString hotId = QStringLiteral("text-recognition.model-hot-start");
         const QString residentId = QStringLiteral("text-recognition.resident-process");
-        require(!backend.switchValue(resident) && !backend.switchValue(hot) &&
-                    !session.state(hotId).enabled && session.state(residentId).enabled,
-                "OCR residency settings default off and hot start is disabled");
-        require(backend.applySwitchValue(resident, true) && backend.applySwitchValue(hot, true),
+        require(backend.switchValue(resident) && !backend.switchValue(hot) &&
+                    session.state(hotId).enabled && session.state(residentId).enabled &&
+                    session.state(residentId).acceptedValue.toBool(),
+                "OCR residency defaults on and hot start is available but unchecked");
+        require(backend.applySwitchValue(hot, true),
                 "OCR settings must persist without attempting resource preparation");
         QCoreApplication::processEvents();
         require(session.state(hotId).enabled && session.state(hotId).acceptedValue.toBool(),
-                "enabling residency must enable hot start immediately");
+                "model hot start can be enabled with default residency");
         require(backend.applySwitchValue(resident, false), "resident preference can be disabled");
         QCoreApplication::processEvents();
         require(!session.state(hotId).enabled && session.state(hotId).acceptedValue.toBool() &&
@@ -722,6 +736,8 @@ int main(int argc, char** argv) {
         QCoreApplication::processEvents();
         require(session.state(hotId).enabled && session.state(hotId).acceptedValue.toBool(),
                 "restoring residency restores the saved hot-start preference");
+        require(backend.applySwitchValue(resident, false),
+                "disable residency before resetting OCR preferences");
         bool resetObserved = false;
         auto resetConnection = QObject::connect(
             &applicationStorage.configuration(), &storage::ConfigurationStore::valueChanged,
@@ -729,7 +745,7 @@ int main(int argc, char** argv) {
                 if (key == QStringLiteral("text_recognition/resident_process") ||
                     key == QStringLiteral("text_recognition/model_hot_start")) {
                     resetObserved = true;
-                    require(!backend.switchValue(resident) && !backend.switchValue(hot),
+                    require(backend.switchValue(resident) && !backend.switchValue(hot),
                             "all observers must see both values reset atomically");
                 }
             });
@@ -737,9 +753,11 @@ int main(int argc, char** argv) {
                 "OCR category reset must succeed");
         QObject::disconnect(resetConnection);
         QCoreApplication::processEvents();
-        require(resetObserved && !backend.switchValue(resident) && !backend.switchValue(hot) &&
-                    !session.state(hotId).enabled,
-                "OCR category reset must clear both preferences and refresh the disabled control");
+        require(resetObserved && backend.switchValue(resident) && !backend.switchValue(hot) &&
+                    session.state(residentId).acceptedValue.toBool() &&
+                    session.state(hotId).enabled && !backend.switchValue(acceleration) &&
+                    !session.state(accelerationId).acceptedValue.toBool(),
+                "OCR category reset must restore residency and clear hot start and acceleration");
         const auto pinBinding = settings::SettingsSelectBinding::PinDoubleClickAction;
         const QString pinId = QStringLiteral("pin-to-screen.double-click-action");
         require(backend.selectValue(pinBinding).toString() == QStringLiteral("thumbnail_mode") &&

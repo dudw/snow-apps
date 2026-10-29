@@ -57,6 +57,9 @@ ScreenshotFloatingToolPaletteWindow::ScreenshotFloatingToolPaletteWindow(
     : QWidget(parent, native::windowFlags()) {
 #ifdef Q_OS_MACOS
     snow_shot::platform::configureControlledWindowDragging(this);
+    // Qt's transient parent alone cannot keep equal-level Cocoa tools above
+    // their owner. Track native child ownership across show/hide and recreation.
+    adqt::widgets::detail::syncMacTopLevelPopupOwnership(this);
 #endif
     SNOW_SHOT_TOOLBAR_PERF_SCOPE("window.base_ctor");
     applyWindowAttributes();
@@ -178,6 +181,8 @@ void ScreenshotFloatingToolPaletteWindow::setOwnerWindow(QWidget* owner) {
         hide();
     }
 
+    // Reparenting can replace the native surface before setTransientOwnerWindow runs.
+    m_transientOwnerWindow = owner;
     setParent(owner, native::windowFlags());
     applyWindowAttributes();
     if (previousGeometry.isValid() && !previousGeometry.isEmpty()) {
@@ -206,10 +211,24 @@ void ScreenshotFloatingToolPaletteWindow::setTransientOwnerWindow(QWidget* owner
     if (owner != nullptr) {
         static_cast<void>(owner->winId());
     }
-    const WId paletteWindowId = winId();
+    static_cast<void>(winId());
+    applyTransientOwnerWindow(this, owner);
+}
+
+void ScreenshotFloatingToolPaletteWindow::applyTransientOwnerWindow(QWidget* window,
+                                                                    QWidget* owner) {
+    // WinIdChange also accompanies teardown. Observe existing surfaces only;
+    // restoring ownership must never recreate a retiring toolbar or its owner.
+    if (window == nullptr)
+        return;
+    const WId paletteWindowId = window->internalWinId();
+    if (paletteWindowId == 0 || window->windowHandle() == nullptr ||
+        (owner != nullptr && (owner->internalWinId() == 0 || owner->windowHandle() == nullptr))) {
+        return;
+    }
     if (owner != nullptr) {
-        adqt::widgets::detail::setTopLevelToolTransientParent(this, owner);
-    } else if (QWindow* handle = windowHandle(); handle && handle->transientParent()) {
+        adqt::widgets::detail::setTopLevelToolTransientParent(window, owner);
+    } else if (QWindow* handle = window->windowHandle(); handle && handle->transientParent()) {
         handle->setTransientParent(nullptr);
     }
     native::setNativePaletteOwner(paletteWindowId, owner);
@@ -302,12 +321,11 @@ void ScreenshotFloatingToolPaletteWindow::restoreNativeSurface() {
 
     applyWindowAttributes();
     resetPhysicalSizeInvariant();
-    const WId paletteWindowId = winId();
+    static_cast<void>(winId());
     if (m_transientOwnerWindow != nullptr) {
         setTransientOwnerWindow(m_transientOwnerWindow.data());
     } else {
-        adqt::widgets::detail::setTopLevelToolTransientParent(this, parentWidget());
-        native::setNativePaletteOwner(paletteWindowId, parentWidget());
+        applyTransientOwnerWindow(this, parentWidget());
     }
     applyPlacementScreen();
     updateWindowMask();
@@ -472,6 +490,11 @@ bool ScreenshotFloatingToolPaletteWindow::event(QEvent* event) {
     if (event != nullptr) {
         if (event->type() == QEvent::WinIdChange) {
             applyPlacementScreen();
+            // Qt can replace the QWindow/HWND implicitly (for example when capture
+            // exclusion enables composition), bypassing restoreNativeSurface().
+            applyTransientOwnerWindow(this, m_transientOwnerWindow != nullptr
+                                                ? m_transientOwnerWindow.data()
+                                                : parentWidget());
         }
     }
 

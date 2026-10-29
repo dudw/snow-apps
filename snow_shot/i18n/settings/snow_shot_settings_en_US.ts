@@ -998,6 +998,10 @@
     <context>
         <name>ScreenshotToolbarEditorSettingsWidget</name>
         <message>
+            <source>AirDrop</source>
+            <translation>AirDrop</translation>
+        </message>
+        <message>
             <source>Barcode recognition</source>
             <translation>Barcode recognition</translation>
         </message>
@@ -1434,6 +1438,10 @@
         <message>
             <source>Automatic text recognition</source>
             <translation>Automatic text recognition</translation>
+        </message>
+        <message>
+            <source>Automatically adapt the icon color to the menu bar background. Uses the image's transparency as its shape and ignores its original colors.</source>
+            <translation>Automatically adapt the icon color to the menu bar background. Uses the image's transparency as its shape and ignores its original colors.</translation>
         </message>
         <message>
             <source>Automatically disable when a focused fullscreen window exists</source>
@@ -2528,6 +2536,10 @@
             <translation>GIF, APNG and WebP resolution, frame rate and looping</translation>
         </message>
         <message>
+            <source>GPU</source>
+            <translation>GPU</translation>
+        </message>
+        <message>
             <source>General</source>
             <translation>General</translation>
         </message>
@@ -2578,6 +2590,10 @@
         <message>
             <source>H.265 (Hardware)</source>
             <translation>H.265 (Hardware)</translation>
+        </message>
+        <message>
+            <source>Hardware acceleration</source>
+            <translation>Hardware acceleration</translation>
         </message>
         <message>
             <source>Hidden tools</source>
@@ -2810,6 +2826,10 @@
         <message>
             <source>Leftover working files from finished or interrupted recordings will be removed</source>
             <translation>Leftover working files from finished or interrupted recordings will be removed</translation>
+        </message>
+        <message>
+            <source>Let macOS control tray icon color</source>
+            <translation>Let macOS control tray icon color</translation>
         </message>
         <message>
             <source>Light</source>
@@ -4598,6 +4618,10 @@
         <message>
             <source>Upload to Cloud</source>
             <translation>Upload to Cloud</translation>
+        </message>
+        <message>
+            <source>Use GPU acceleration when available. Recognition uses the CPU while acceleration is unavailable.</source>
+            <translation>Use GPU acceleration when available. Recognition uses the CPU while acceleration is unavailable.</translation>
         </message>
         <message>
             <source>Use global mouse gestures, select individual window elements, and translate selected text.</source>

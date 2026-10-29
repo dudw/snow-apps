@@ -81,6 +81,7 @@ const QStringList kActionToolbarItemIds = editionActionIds({
     QStringLiteral("scrolling-screenshot"),
     QStringLiteral("quick-save"),
     QStringLiteral("print"),
+    QStringLiteral("airdrop"),
     QStringLiteral("save-as-file"),
     QStringLiteral("upload-to-cloud"),
     QStringLiteral("separator"),
@@ -134,8 +135,8 @@ QVector<QStringList> defaultActionToolbarPositions() {
         {QStringLiteral("text-recognition")},
         {QStringLiteral("text-translation")},
         {QStringLiteral("scrolling-screenshot")},
-        {QStringLiteral("upload-to-cloud"), QStringLiteral("print"), QStringLiteral("quick-save"),
-         QStringLiteral("save-as-file")},
+        {QStringLiteral("upload-to-cloud"), QStringLiteral("airdrop"), QStringLiteral("print"),
+         QStringLiteral("quick-save"), QStringLiteral("save-as-file")},
         {QStringLiteral("separator")},
         {QStringLiteral("cancel")},
         {QStringLiteral("copy")},
@@ -147,7 +148,7 @@ const QStringList kPinnedActionToolbarItemIds = editionActionIds(
      QStringLiteral("convert-to-markdown"), QStringLiteral("latex-recognition"),
      QStringLiteral("convert-to-html"), QStringLiteral("text-recognition"),
      QStringLiteral("text-translation"), QStringLiteral("separator"), QStringLiteral("print"),
-     QStringLiteral("quick-save"), QStringLiteral("save-as-file"),
+     QStringLiteral("airdrop"), QStringLiteral("quick-save"), QStringLiteral("save-as-file"),
      QStringLiteral("upload-to-cloud"), QStringLiteral("copy"), QStringLiteral("confirm"),
      QStringLiteral("confirm-separator")});
 
@@ -159,8 +160,8 @@ QVector<QStringList> defaultPinnedActionToolbarPositions() {
         {QStringLiteral("text-recognition")},
         {QStringLiteral("text-translation")},
         {QStringLiteral("separator")},
-        {QStringLiteral("upload-to-cloud"), QStringLiteral("print"), QStringLiteral("quick-save"),
-         QStringLiteral("save-as-file")},
+        {QStringLiteral("upload-to-cloud"), QStringLiteral("airdrop"), QStringLiteral("print"),
+         QStringLiteral("quick-save"), QStringLiteral("save-as-file")},
         {QStringLiteral("copy")},
         {QStringLiteral("confirm-separator")},
         {QStringLiteral("confirm")},
@@ -328,8 +329,11 @@ const QVector<ConfigurationSchemaEntry> kRawEntries = {
      ConfigurationValueKind::String,
      std::nullopt,
      {QStringLiteral("none"), QStringLiteral("system")}},
-    {QStringLiteral("text_recognition/resident_process"), false, ConfigurationValueKind::Boolean},
+    {QStringLiteral("text_recognition/resident_process"), !app::edition::isMini,
+     ConfigurationValueKind::Boolean},
     {QStringLiteral("text_recognition/model_hot_start"), false, ConfigurationValueKind::Boolean},
+    {QStringLiteral("text_recognition/hardware_acceleration"), false,
+     ConfigurationValueKind::Boolean},
     {QStringLiteral("text_recognition/model_type"),
      QStringLiteral("small"),
      ConfigurationValueKind::String,
@@ -416,6 +420,9 @@ const QVector<ConfigurationSchemaEntry> kRawEntries = {
      {QStringLiteral("smart_merge"), QStringLiteral("original")}},
 #endif
     {QStringLiteral("interface/sidebar_collapsed"), false, ConfigurationValueKind::Boolean},
+    {QStringLiteral("interface/screenshot_history_page_size"), 10, ConfigurationValueKind::Integer},
+    {QStringLiteral("interface/pinned_window_management_page_size"), 10,
+     ConfigurationValueKind::Integer},
     {QStringLiteral("interface/main_window_geometry"), QJsonObject(),
      ConfigurationValueKind::Structured},
 #if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
@@ -1563,6 +1570,7 @@ const QVector<ConfigurationSchemaEntry> kRawEntries = {
       QStringLiteral("restore_last_closed_window"), QStringLiteral("repeat_action")}},
     {QStringLiteral("pin_to_screen/auto_resize_window"), true, ConfigurationValueKind::Boolean},
     {QStringLiteral("tray/enabled"), true, ConfigurationValueKind::Boolean},
+    {QStringLiteral("tray/use_system_icon_color"), false, ConfigurationValueKind::Boolean},
     {QStringLiteral("tray/icon"),
      QStringLiteral("default"),
      ConfigurationValueKind::String,
@@ -2450,6 +2458,28 @@ normalizeToolbarLayout(const QJsonValue& value, const QStringList& itemIds,
             hiddenSet.insert(QStringLiteral("print"));
         }
     }
+    if (known.contains(QStringLiteral("airdrop")) &&
+        !positioned.contains(QStringLiteral("airdrop")) &&
+        !hiddenSet.contains(QStringLiteral("airdrop"))) {
+        for (QStringList& position : positions) {
+            const qsizetype save = position.indexOf(QStringLiteral("save-as-file"));
+            if (save < 0)
+                continue;
+            const qsizetype print = position.indexOf(QStringLiteral("print"));
+            const qsizetype quick = position.indexOf(QStringLiteral("quick-save"));
+            position.insert(print >= 0   ? print
+                            : quick >= 0 ? quick
+                                         : save,
+                            QStringLiteral("airdrop"));
+            positioned.insert(QStringLiteral("airdrop"));
+            break;
+        }
+        if (!positioned.contains(QStringLiteral("airdrop")) &&
+            hiddenSet.contains(QStringLiteral("save-as-file"))) {
+            hidden.push_back(QStringLiteral("airdrop"));
+            hiddenSet.insert(QStringLiteral("airdrop"));
+        }
+    }
     if (migrateScreenshotLayout && !positions.isEmpty() &&
         known.contains(QStringLiteral("convert-to-markdown"))) {
         // Upgrade earlier defaults without changing custom placements.
@@ -2931,6 +2961,10 @@ ConfigurationNormalization ConfigurationSchema::normalize(const QString& key,
     }
     if (key == QStringLiteral("screen_recording/frame_rate")) {
         return normalizeAllowedInteger(value, {5, 10, 15, 24, 30, 60, 120, 83});
+    }
+    if (key == QStringLiteral("interface/screenshot_history_page_size") ||
+        key == QStringLiteral("interface/pinned_window_management_page_size")) {
+        return normalizeAllowedInteger(value, {10, 20, 50});
     }
     if (key == QStringLiteral("screenshot_ui/selection_transition_animation")) {
         if (value.isBool()) {

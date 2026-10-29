@@ -61,6 +61,23 @@ void trayDarkIconSettingsHaveIndependentContracts() {
     require(!search.search(QStringLiteral("Dark theme icon")).isEmpty() &&
                 !search.search(QStringLiteral("Dark theme custom icon")).isEmpty(),
             "dark theme tray icon settings must be searchable");
+    const auto* systemColor =
+        registry.fieldForSwitch(settings::SettingsSwitchBinding::TrayUseSystemIconColor);
+#ifdef Q_OS_MACOS
+    require(systemColor &&
+                systemColor->configurationKey == QStringLiteral("tray/use_system_icon_color") &&
+                systemColor->defaultValue.isBool() && !systemColor->defaultValue.toBool(true) &&
+                systemColor->pageId == QStringLiteral("desktop-tools") &&
+                systemColor->sectionId == QStringLiteral("tray") &&
+                systemColor->reset == settings::SettingsSectionReset::Tray &&
+                !search.search(QStringLiteral("Let macOS control tray icon color")).isEmpty(),
+            "macOS exposes a searchable system icon color switch that defaults off and resets with "
+            "tray settings");
+#else
+    require(systemColor == nullptr &&
+                search.search(QStringLiteral("Let macOS control tray icon color")).isEmpty(),
+            "other platforms must omit macOS system icon color settings");
+#endif
 }
 
 settings::TranslatableText text(const char* source) {
@@ -1468,7 +1485,9 @@ void builtInCatalogIsCompleteAndValid() {
                 proxySelect->options.at(1).value == QStringLiteral("system") &&
                 textRecognition != nullptr &&
                 textRecognition->reset == settings::SettingsSectionReset::TextRecognition &&
-                textRecognition->items.size() == 5 &&
+                textRecognition->items.size() == 6 &&
+                textRecognition->items.at(3).id ==
+                    QStringLiteral("text-recognition.hardware-acceleration") &&
                 textRecognition->items.at(0).id == QStringLiteral("text-recognition.model-type") &&
                 textRecognition->items.at(1).id ==
                     QStringLiteral("text-recognition.detector-resize-policy") &&
@@ -3806,6 +3825,10 @@ void memoryOptimizationPolicyCatalog() {
 
 int main(int argc, char** argv) {
     QCoreApplication application(argc, argv);
+    if (application.arguments().contains(QStringLiteral("--tray-icons-only"))) {
+        trayDarkIconSettingsHaveIndependentContracts();
+        return 0;
+    }
     if (snow_shot::app::distribution::isStoreManaged()) {
         const auto& registry = settings::builtInSettingsRegistry();
         require(registry.isValid(), "Store settings retain a valid registry");

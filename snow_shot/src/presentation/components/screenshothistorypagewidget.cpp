@@ -22,6 +22,7 @@
 #include "snow_shot/presentation/styles/mainwindowcomponenttoken.h"
 #include "snow_shot/storage/applicationstorage.h"
 #include "snow_shot/storage/capturehistoryrepository.h"
+#include "snow_shot/storage/settingsadapters.h"
 #include "snow_shot/storage/storageusagetracker.h"
 
 #include "antd_icons.h"
@@ -1256,7 +1257,7 @@ ScreenshotHistoryPageWidget::ScreenshotHistoryPageWidget(
     m_selectionBarLayout->addWidget(m_selectionActions, 0, Qt::AlignRight | Qt::AlignVCenter);
     selectionBarOuterLayout->addWidget(m_selectionPanel);
     m_selectionBar->hide();
-    contentLayout->addWidget(m_selectionBar, 0);
+    pageContainer->addStickyWidget(m_selectionBar, metric.marginSM);
 
     m_deleteAllConfirmation = new adqt::widgets::AdPopconfirm(content);
     m_deleteAllConfirmation->setObjectName(QStringLiteral("screenshotHistoryDeleteAllConfirm"));
@@ -1292,7 +1293,8 @@ ScreenshotHistoryPageWidget::ScreenshotHistoryPageWidget(
 
     m_pagination = new adqt::widgets::AdPagination(content);
     m_pagination->setObjectName(QStringLiteral("screenshotHistoryPagination"));
-    history_page::configurePagination(m_pagination);
+    history_page::configurePagination(m_pagination,
+                                      storage::InterfaceSettings().screenshotHistoryPageSize());
     m_pagination->setTotalTextFormatter(
         [](int total, const adqt::widgets::AdPagination::Range& range) {
             return ScreenshotHistoryPageWidget::tr("%1-%2 of %3")
@@ -1361,11 +1363,13 @@ ScreenshotHistoryPageWidget::ScreenshotHistoryPageWidget(
             rebuildEntries();
         }
     });
-    connect(m_pagination, &adqt::widgets::AdPagination::pageSizeChanged, this, [this](int) {
-        if (!m_updatingPagination) {
-            rebuildEntries();
-        }
-    });
+    connect(m_pagination, &adqt::widgets::AdPagination::pageSizeChanged, this,
+            [this](int pageSize) {
+                storage::InterfaceSettings().setScreenshotHistoryPageSize(pageSize);
+                if (!m_updatingPagination) {
+                    rebuildEntries();
+                }
+            });
 
     connect(m_dataSource, &ScreenshotHistoryPageDataSource::historyChanged, this,
             &ScreenshotHistoryPageWidget::handleHistoryChanged);

@@ -998,6 +998,10 @@
     <context>
         <name>ScreenshotToolbarEditorSettingsWidget</name>
         <message>
+            <source>AirDrop</source>
+            <translation>AirDrop</translation>
+        </message>
+        <message>
             <source>Barcode recognition</source>
             <translation>條碼辨識</translation>
         </message>
@@ -1434,6 +1438,10 @@
         <message>
             <source>Automatic text recognition</source>
             <translation>自動文字辨識</translation>
+        </message>
+        <message>
+            <source>Automatically adapt the icon color to the menu bar background. Uses the image's transparency as its shape and ignores its original colors.</source>
+            <translation>根據選單列背景自動調整圖示顏色。使用影像的透明度決定形狀，忽略其原始顏色。</translation>
         </message>
         <message>
             <source>Automatically disable when a focused fullscreen window exists</source>
@@ -2528,6 +2536,10 @@
             <translation>GIF、APNG 和 WebP 的解析度、影格率與循環播放</translation>
         </message>
         <message>
+            <source>GPU</source>
+            <translation>GPU</translation>
+        </message>
+        <message>
             <source>General</source>
             <translation>一般</translation>
         </message>
@@ -2578,6 +2590,10 @@
         <message>
             <source>H.265 (Hardware)</source>
             <translation>H.265（硬體）</translation>
+        </message>
+        <message>
+            <source>Hardware acceleration</source>
+            <translation>硬體加速</translation>
         </message>
         <message>
             <source>Hidden tools</source>
@@ -2810,6 +2826,10 @@
         <message>
             <source>Leftover working files from finished or interrupted recordings will be removed</source>
             <translation>已完成或中斷的螢幕錄製所遺留的工作檔案將被刪除</translation>
+        </message>
+        <message>
+            <source>Let macOS control tray icon color</source>
+            <translation>讓 macOS 控制系統匣圖示顏色</translation>
         </message>
         <message>
             <source>Light</source>
@@ -4598,6 +4618,10 @@
         <message>
             <source>Upload to Cloud</source>
             <translation>上傳至雲端</translation>
+        </message>
+        <message>
+            <source>Use GPU acceleration when available. Recognition uses the CPU while acceleration is unavailable.</source>
+            <translation>在可用時使用 GPU 加速。加速不可用時，辨識將使用 CPU。</translation>
         </message>
         <message>
             <source>Use global mouse gestures, select individual window elements, and translate selected text.</source>
