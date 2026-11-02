@@ -12,9 +12,10 @@ build-tools component, including `armasm64.exe`. A native ARM64 host uses
 `HostARM64/arm64`; an x64 host uses `Hostx64/arm64`.
 
 The OCR worker enables the `gpu` Cargo feature on both Windows architectures.
-Its host-side shaderc build requires Python, CMake, and the host C++ compiler;
-the resulting SPIR-V shaders are embedded. Deployment needs no Vulkan SDK or
-shader compiler. Hardware acceleration defaults off and requires a physical GPU
+Its host-side shaderc build requires Python, CMake, Ninja, Git, and the host C++
+compiler; the resulting SPIR-V shaders are embedded. Deployment needs no Vulkan
+SDK or shader compiler. Hardware acceleration defaults off and requires a
+physical GPU
 with the Vulkan 1.3 features accepted by `simd-paddle-ocr-rs`. Missing loaders or
 unsupported devices fall back to CPU without blocking recognition on discovery.
 

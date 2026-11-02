@@ -1,6 +1,7 @@
 #include "snow_shot/presentation/screenshottextresultwindow.h"
 
 #include "snow_shot/presentation/components/icons/snowshoticons.h"
+#include "snow_shot/presentation/styles/themecolorscheme.h"
 #include "snow_shot/presentation/styles/thememanager.h"
 #include "snow_shot/presentation/windowcloseshortcut.h"
 
@@ -13,9 +14,7 @@
 #include <QCoreApplication>
 #include <QEvent>
 #include <QFrame>
-#include <QGraphicsPixmapItem>
-#include <QGraphicsScene>
-#include <QGraphicsView>
+#include <QGridLayout>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -45,6 +44,15 @@ constexpr int kDefaultHeight = 720;
 constexpr int kMinimumWidth = 760;
 constexpr int kMinimumHeight = 480;
 constexpr int kPreviewMinimumWidth = 320;
+// The settings column keeps a fixed width: a proportional split used to squeeze the language
+// selects and the translate action until their right halves were clipped by the scroll viewport.
+// 400 leaves room for the two 120 px selects, the action, and longer translated labels.
+constexpr int kSidePanelWidth = 400;
+// The grey canvas stays visible around a fitted image, so the screenshot keeps a readable frame.
+constexpr int kPreviewMargin = 8;
+// Upper zoom bound in device pixels per source pixel; beyond this one step is pure interpolation.
+constexpr qreal kPreviewMaximumScale = 8.0;
+
 
 QString text(const char* source) {
     return QCoreApplication::translate("ScreenshotTextResultWindow",
@@ -90,46 +98,40 @@ QColor mutedTextColor() {
 
 } // namespace
 
-// Zoomable preview of the captured region. Wheel zoom and drag panning mirror the companion
-// preview window; double-click returns to the fitted scale.
-class ScreenshotTextResultPreviewView final : public QGraphicsView {
+// Zoomable preview of the captured region. Every scale change resamples the source pixels into a
+// device-pixel-sized cache, so the fitted view and each zoom step draw one crisp image instead of
+// the blurred double resample of a graphics-view transform. The canvas around the image is plain
+// grey: a translucent theme fill used to reach a style sheet and turn opaque black there. Wheel
+// zooms around the cursor, dragging pans, and a double-click returns to the fitted scale.
+class ScreenshotTextResultPreviewView final : public QWidget {
   public:
-    explicit ScreenshotTextResultPreviewView(QWidget* parent = nullptr)
-        : QGraphicsView(parent), m_scene(new QGraphicsScene(this)) {
+    explicit ScreenshotTextResultPreviewView(QWidget* parent = nullptr) : QWidget(parent) {
         setObjectName(QStringLiteral("screenshotTextResultPreview"));
-        setScene(m_scene);
-        setFrameShape(QFrame::NoFrame);
-        setDragMode(QGraphicsView::ScrollHandDrag);
-        setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-        setResizeAnchor(QGraphicsView::AnchorViewCenter);
-        setRenderHint(QPainter::SmoothPixmapTransform, true);
-        setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-        setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         setMinimumWidth(kPreviewMinimumWidth);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        setFocusPolicy(Qt::StrongFocus);
+        setMouseTracking(true);
+        setCursor(Qt::OpenHandCursor);
         applyTheme();
-        m_item = m_scene->addPixmap(QPixmap());
     }
 
     void applyTheme() {
         const auto scheme = styles::ThemeManager::instance().themeColorScheme();
-        setBackgroundBrush(scheme.alias.surfaceAltBg);
-        setStyleSheet(
-            QStringLiteral("QGraphicsView { border: 1px solid %1; background: %2; }")
-                .arg(scheme.alias.subtleBorder.name(), scheme.alias.surfaceAltBg.name()));
+        // A neutral canvas keeps white documents and dark screenshots equally readable.
+        m_canvasColor = scheme.appearance == styles::ThemeAppearance::Dark
+                            ? QColor(0x40, 0x40, 0x40)
+                            : QColor(0x8C, 0x8C, 0x8C);
+        m_borderColor = scheme.alias.subtleBorder;
+        update();
     }
 
     void setImage(const QImage& image) {
         m_image = image;
-        if (image.isNull()) {
-            m_item->setPixmap(QPixmap());
-            m_scene->setSceneRect(QRectF());
-            resetTransform();
-            return;
-        }
-        m_item->setPixmap(QPixmap::fromImage(image));
-        m_scene->setSceneRect(QRectF(QPointF(0, 0), QSizeF(image.size())));
-        m_userZoom = false;
-        fitImage();
+        m_userScale = 0.0;
+        m_pan = QPointF();
+        m_render = QPixmap();
+        m_renderKey = {};
+        update();
     }
 
     [[nodiscard]] QImage image() const {
@@ -137,62 +139,222 @@ class ScreenshotTextResultPreviewView final : public QGraphicsView {
     }
 
   protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.fillRect(rect(), m_canvasColor);
+        if (m_image.isNull())
+            return;
+        const QPixmap& render = renderedPixmap();
+        if (render.isNull())
+            return;
+        const QRectF target = imageRect();
+        // Below 1:1 the cache already matches the device raster, so the draw stays 1:1; above it
+        // only a magnified raster is available and smooth sampling keeps the steps even.
+        const QSize displayed = (target.size() * deviceRaster()).toSize();
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, displayed != render.size());
+        painter.drawPixmap(target, render, QRectF(render.rect()));
+        painter.setPen(m_borderColor);
+        painter.drawRect(target.adjusted(-0.5, -0.5, 0.5, 0.5));
+    }
+
     void resizeEvent(QResizeEvent* event) override {
-        QGraphicsView::resizeEvent(event);
-        if (!m_userZoom)
-            fitImage();
+        QWidget::resizeEvent(event);
+        clampPan();
     }
 
     void wheelEvent(QWheelEvent* event) override {
         if (m_image.isNull()) {
-            QGraphicsView::wheelEvent(event);
+            QWidget::wheelEvent(event);
             return;
         }
         const qreal steps = event->angleDelta().y() / 120.0;
         if (qFuzzyIsNull(steps)) {
-            QGraphicsView::wheelEvent(event);
+            QWidget::wheelEvent(event);
             return;
         }
-        const qreal current = transform().m11();
-        const qreal next = std::clamp(current * std::pow(1.15, steps), 0.05, 16.0);
-        if (qFuzzyCompare(next, current)) {
+        const qreal previous = activeScale();
+        const qreal fit = fitScale();
+        const qreal limit = std::max<qreal>(fit, kPreviewMaximumScale * devicePixelRatioF());
+        const qreal next = std::clamp(previous * std::pow(1.15, steps), fit, limit);
+        if (qFuzzyCompare(next, previous)) {
             event->accept();
             return;
         }
-        scale(next / current, next / current);
-        m_userZoom = true;
+        const QPointF cursor = event->position();
+        const QRectF before = imageRect();
+        const qreal unitBefore = imageSize().width() / std::max(1, m_image.width());
+        const QPointF source((cursor.x() - before.left()) / unitBefore,
+                             (cursor.y() - before.top()) / unitBefore);
+        m_userScale = next <= fit * 1.0005 ? 0.0 : next;
+        const QRectF centered = centeredImageRect();
+        const qreal unitAfter = imageSize().width() / std::max(1, m_image.width());
+        m_pan =
+            cursor - QPointF(source.x() * unitAfter, source.y() * unitAfter) - centered.topLeft();
+        clampPan();
+        update();
+        event->accept();
+    }
+
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton || m_image.isNull()) {
+            QWidget::mousePressEvent(event);
+            return;
+        }
+        m_dragging = true;
+        m_dragOrigin = event->position();
+        m_dragPan = m_pan;
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override {
+        if (!m_dragging) {
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+        m_pan = m_dragPan + (event->position() - m_dragOrigin);
+        clampPan();
+        update();
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton || !m_dragging) {
+            QWidget::mouseReleaseEvent(event);
+            return;
+        }
+        m_dragging = false;
+        setCursor(Qt::OpenHandCursor);
         event->accept();
     }
 
     void mouseDoubleClickEvent(QMouseEvent* event) override {
         if (m_image.isNull()) {
-            QGraphicsView::mouseDoubleClickEvent(event);
+            QWidget::mouseDoubleClickEvent(event);
             return;
         }
-        m_userZoom = false;
-        fitImage();
+        m_userScale = 0.0;
+        m_pan = QPointF();
+        update();
         event->accept();
     }
 
-  private:
-    void fitImage() {
-        if (m_image.isNull()) {
-            resetTransform();
-            return;
-        }
-        // Fitting can change scroll bar visibility, which resizes the viewport again.
-        if (m_fitting)
-            return;
-        m_fitting = true;
-        fitInView(QRectF(QPointF(0, 0), QSizeF(m_image.size())), Qt::KeepAspectRatio);
-        m_fitting = false;
+    void hideEvent(QHideEvent* event) override {
+        // The device-sized cache is only useful while the surface is on screen.
+        m_render = QPixmap();
+        m_renderKey = {};
+        QWidget::hideEvent(event);
     }
 
-    QGraphicsScene* m_scene = nullptr;
-    QGraphicsPixmapItem* m_item = nullptr;
+  private:
+    struct RenderKey {
+        qint64 source = 0;
+        QSize size;
+
+        [[nodiscard]] bool matches(const RenderKey& other) const {
+            return source == other.source && size == other.size;
+        }
+    };
+
+    [[nodiscard]] qreal deviceRaster() const {
+        const qreal ratio = devicePixelRatioF();
+        return ratio > 0.0 ? ratio : 1.0;
+    }
+
+    // Device pixels per source pixel while the image is fitted to the viewport.
+    [[nodiscard]] qreal fitScale() const {
+        if (m_image.isNull())
+            return 1.0;
+        const qreal raster = deviceRaster();
+        const qreal horizontal =
+            std::max(1.0, (width() - 2 * kPreviewMargin) * raster) / m_image.width();
+        const qreal vertical =
+            std::max(1.0, (height() - 2 * kPreviewMargin) * raster) / m_image.height();
+        return std::max(0.01, std::min(horizontal, vertical));
+    }
+
+    [[nodiscard]] qreal activeScale() const {
+        return m_userScale > 0.0 ? m_userScale : fitScale();
+    }
+
+    // Exact device raster of the cached render; taking the size from it keeps the draw 1:1.
+    [[nodiscard]] QSize deviceImageSize() const {
+        if (m_image.isNull())
+            return {};
+        const qreal scale = activeScale();
+        return QSize(std::max(1, qRound(m_image.width() * scale)),
+                     std::max(1, qRound(m_image.height() * scale)));
+    }
+
+    [[nodiscard]] QSizeF imageSize() const {
+        const qreal raster = deviceRaster();
+        const QSize device = deviceImageSize();
+        return QSizeF(device.width() / raster, device.height() / raster);
+    }
+
+    [[nodiscard]] QRectF imageRectFor(const QPointF& pan) const {
+        const QSizeF size = imageSize();
+        const qreal raster = deviceRaster();
+        qreal x = (width() - size.width()) / 2.0 + pan.x();
+        qreal y = (height() - size.height()) / 2.0 + pan.y();
+        // Snap the origin to whole device pixels: a fractional one would resample the cached
+        // raster and bring back the softness this view exists to avoid.
+        x = std::round(x * raster) / raster;
+        y = std::round(y * raster) / raster;
+        return QRectF(QPointF(x, y), size);
+    }
+
+    [[nodiscard]] QRectF imageRect() const {
+        return imageRectFor(m_pan);
+    }
+
+    [[nodiscard]] QRectF centeredImageRect() const {
+        return imageRectFor(QPointF());
+    }
+
+    void clampPan() {
+        if (m_image.isNull() || m_userScale <= 0.0) {
+            m_pan = QPointF();
+            return;
+        }
+        const QRectF centered = centeredImageRect();
+        const qreal slackX = std::max<qreal>(0.0, (centered.width() - width()) / 2.0);
+        const qreal slackY = std::max<qreal>(0.0, (centered.height() - height()) / 2.0);
+        m_pan.setX(std::clamp(m_pan.x(), -slackX, slackX));
+        m_pan.setY(std::clamp(m_pan.y(), -slackY, slackY));
+    }
+
+    // Zooming past 1:1 magnifies the source anyway, so the cache never grows beyond it; the
+    // painter stretches that raster to the displayed size instead.
+    const QPixmap& renderedPixmap() {
+        const QSize source = m_image.size();
+        const qreal scale = std::min<qreal>(1.0, activeScale());
+        const QSize target(std::max(1, qRound(source.width() * scale)),
+                           std::max(1, qRound(source.height() * scale)));
+        const RenderKey key{m_image.cacheKey(), target};
+        if (!m_render.isNull() && m_renderKey.matches(key))
+            return m_render;
+        m_render =
+            QPixmap::fromImage(target == source ? m_image
+                                                : m_image.scaled(target, Qt::IgnoreAspectRatio,
+                                                                 Qt::SmoothTransformation));
+        // The raster is sized in device pixels here, so the draw must not re-apply a source ratio.
+        m_render.setDevicePixelRatio(1.0);
+        m_renderKey = key;
+        return m_render;
+    }
+
     QImage m_image;
-    bool m_userZoom = false;
-    bool m_fitting = false;
+    QPixmap m_render;
+    RenderKey m_renderKey;
+    QColor m_canvasColor;
+    QColor m_borderColor;
+    QPointF m_pan;
+    QPointF m_dragOrigin;
+    QPointF m_dragPan;
+    // Device pixels per source pixel chosen by the user; zero means "fitted".
+    qreal m_userScale = 0.0;
+    bool m_dragging = false;
 };
 
 ScreenshotTextResultWindow::ScreenshotTextResultWindow(QObject* parent)
@@ -290,6 +452,9 @@ void ScreenshotTextResultWindow::buildUi() {
     scroll->setObjectName(QStringLiteral("screenshotTextResultScroll"));
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setWidgetResizable(true);
+    // The column is sized to its content, so horizontal scrolling would only hide controls.
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setFixedWidth(kSidePanelWidth);
     auto* rightPanel = new QWidget(scroll);
     rightPanel->setObjectName(QStringLiteral("screenshotTextResultRightPanel"));
     auto* rightLayout = new QVBoxLayout(rightPanel);
@@ -299,9 +464,16 @@ void ScreenshotTextResultWindow::buildUi() {
     m_settingsTitle = makeSectionTitle(rightPanel);
     rightLayout->addWidget(m_settingsTitle);
 
-    auto* languageRow = new QHBoxLayout;
-    languageRow->setContentsMargins(0, 0, 0, 0);
-    languageRow->setSpacing(8);
+    // Two language columns with their labels above, and the translate action on the right. The
+    // single-row arrangement needed roughly 480 logical pixels and overflowed this width.
+    auto* settingsGrid = new QGridLayout;
+    settingsGrid->setContentsMargins(0, 0, 0, 0);
+    settingsGrid->setHorizontalSpacing(8);
+    settingsGrid->setVerticalSpacing(4);
+    settingsGrid->setColumnStretch(0, 1);
+    settingsGrid->setColumnStretch(1, 1);
+    settingsGrid->setColumnStretch(2, 0);
+
     m_sourceLabel = makeLabel(QString(), rightPanel);
     m_sourceSelect = new AdSelect(rightPanel);
     m_sourceSelect->setObjectName(QStringLiteral("screenshotTextResultSourceLanguage"));
@@ -314,12 +486,19 @@ void ScreenshotTextResultWindow::buildUi() {
     m_targetSelect->setSearchFilterFields({QStringLiteral("label")});
     m_translate = makeTextButton(QString(), rightPanel, true);
     m_translate->setObjectName(QStringLiteral("screenshotTextResultTranslate"));
-    languageRow->addWidget(m_sourceLabel);
-    languageRow->addWidget(m_sourceSelect, 1);
-    languageRow->addWidget(m_targetLabel);
-    languageRow->addWidget(m_targetSelect, 1);
-    languageRow->addWidget(m_translate);
-    rightLayout->addLayout(languageRow);
+    m_typesettingLabel = makeLabel(QString(), rightPanel);
+    m_typesettingSelect = new AdSelect(rightPanel);
+    m_typesettingSelect->setObjectName(QStringLiteral("screenshotTextResultTypesetting"));
+    m_typesettingSelect->setAllowClear(false);
+
+    settingsGrid->addWidget(m_sourceLabel, 0, 0);
+    settingsGrid->addWidget(m_targetLabel, 0, 1);
+    settingsGrid->addWidget(m_sourceSelect, 1, 0);
+    settingsGrid->addWidget(m_targetSelect, 1, 1);
+    settingsGrid->addWidget(m_translate, 0, 2, 2, 1, Qt::AlignBottom);
+    settingsGrid->addWidget(m_typesettingLabel, 2, 0);
+    settingsGrid->addWidget(m_typesettingSelect, 3, 0, 1, 2);
+    rightLayout->addLayout(settingsGrid);
 
     auto* actionRow = new QHBoxLayout;
     actionRow->setContentsMargins(0, 0, 0, 0);
@@ -328,15 +507,9 @@ void ScreenshotTextResultWindow::buildUi() {
     m_recognize->setObjectName(QStringLiteral("screenshotTextResultRecognize"));
     m_translationSettings = makeTextButton(QString(), rightPanel, false);
     m_translationSettings->setObjectName(QStringLiteral("screenshotTextResultTranslateSettings"));
-    m_typesettingLabel = makeLabel(QString(), rightPanel);
-    m_typesettingSelect = new AdSelect(rightPanel);
-    m_typesettingSelect->setObjectName(QStringLiteral("screenshotTextResultTypesetting"));
-    m_typesettingSelect->setAllowClear(false);
     actionRow->addWidget(m_recognize);
     actionRow->addWidget(m_translationSettings);
     actionRow->addStretch(1);
-    actionRow->addWidget(m_typesettingLabel);
-    actionRow->addWidget(m_typesettingSelect);
     rightLayout->addLayout(actionRow);
 
     auto* divider = new QFrame(rightPanel);
@@ -386,8 +559,10 @@ void ScreenshotTextResultWindow::buildUi() {
 
     scroll->setWidget(rightPanel);
     m_splitter->addWidget(scroll);
-    m_splitter->setStretchFactor(0, 5);
-    m_splitter->setStretchFactor(1, 6);
+    // Only the preview grows with the window; the settings column keeps its fixed width.
+    m_splitter->setStretchFactor(0, 1);
+    m_splitter->setStretchFactor(1, 0);
+    m_splitter->setSizes({kDefaultWidth - kSidePanelWidth, kSidePanelWidth});
 
     connect(m_imageCopy, &AdButton::clicked, this, &ScreenshotTextResultWindow::copyImageRequested);
     connect(m_ocrCopy, &AdButton::clicked, this, [this] { copyText(ocrText()); });
@@ -540,9 +715,11 @@ void ScreenshotTextResultWindow::setRecognizing(bool busy) {
 }
 
 void ScreenshotTextResultWindow::setTranslating(bool busy, bool streaming) {
-    // Streaming only changes how the text arrives; the pane stays readable throughout.
+    // `busy` is the in-flight request rather than the session's translation mode: a finished
+    // translation has to hand the action back instead of leaving it spinning. Streaming only
+    // changes how the text arrives; the pane stays readable throughout.
     Q_UNUSED(streaming)
-    m_translating = busy;
+    m_translateBusy = busy;
     updateTranslateControls();
 }
 
@@ -556,12 +733,12 @@ void ScreenshotTextResultWindow::updateRecognizeControls() {
 void ScreenshotTextResultWindow::updateTranslateControls() {
     if (m_translate == nullptr)
         return;
-    m_translate->setBusy(m_translating);
-    m_translate->setEnabled(!m_translating);
+    m_translate->setBusy(m_translateBusy);
+    m_translate->setEnabled(!m_translateBusy);
     if (m_sourceSelect != nullptr)
-        m_sourceSelect->setEnabled(!m_translating);
+        m_sourceSelect->setEnabled(!m_translateBusy);
     if (m_targetSelect != nullptr)
-        m_targetSelect->setEnabled(!m_translating);
+        m_targetSelect->setEnabled(!m_translateBusy);
 }
 
 void ScreenshotTextResultWindow::setOcrStatus(const QString& message, bool error) {
@@ -586,7 +763,7 @@ void ScreenshotTextResultWindow::setStatus(QLabel* label, const QString& message
 void ScreenshotTextResultWindow::clearTranslationResult() {
     setTranslationText(QString());
     setTranslationStatus(QString(), false);
-    m_translating = false;
+    m_translateBusy = false;
     updateTranslateControls();
 }
 

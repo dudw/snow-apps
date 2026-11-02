@@ -69,6 +69,34 @@ foreach ($call in $script:Calls | Where-Object Command -CEQ cargo) {
     Require ($call.Arguments[0] -ceq 'metadata') 'Cargo must use the active toolchain without an exact-version override.'
 }
 
+# Visual Studio keeps Ninja outside PATH; the OCR worker's shaderc build needs it.
+$ninjaFixture = Join-Path ([IO.Path]::GetTempPath()) ("snow-ninja-test-" + [guid]::NewGuid().ToString('N'))
+$ninjaDirectory = Join-Path $ninjaFixture 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'
+$savedVsInstallDirectory = $env:VSINSTALLDIR
+$savedVcInstallDirectory = $env:VCINSTALLDIR
+$savedPath = $env:Path
+try {
+    New-Item -ItemType Directory -Path $ninjaDirectory -Force | Out-Null
+    $env:VSINSTALLDIR = $ninjaFixture
+    $env:VCINSTALLDIR = $null
+    $env:Path = @($env:Path -split ';' | Where-Object { $_ -and
+            -not (Test-Path -LiteralPath (Join-Path $_ 'ninja.exe') -PathType Leaf) }) -join ';'
+    Require ((Get-SnowNinjaSearchDirectory) -ccontains $ninjaDirectory) `
+        'Locate Ninja under the Visual Studio installation that owns the MSVC tools.'
+    Require ($null -eq (Resolve-SnowNinjaExecutable)) 'Report a missing Ninja instead of guessing.'
+    New-Item -ItemType File -Path (Join-Path $ninjaDirectory 'ninja.exe') | Out-Null
+    Require ((Resolve-SnowNinjaExecutable) -ceq (Join-Path $ninjaDirectory 'ninja.exe')) `
+        'Fall back to the Visual Studio Ninja when PATH has none.'
+    Require ((Resolve-SnowNinjaExecutable -SearchDirectory $ninjaDirectory) -ceq
+        (Join-Path $ninjaDirectory 'ninja.exe')) 'Accept an explicitly provided Ninja directory.'
+}
+finally {
+    $env:VSINSTALLDIR = $savedVsInstallDirectory
+    $env:VCINSTALLDIR = $savedVcInstallDirectory
+    $env:Path = $savedPath
+    Remove-Item -LiteralPath $ninjaFixture -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 $saved = @{}
 foreach ($name in @('VCPKG_ROOT', 'VCPKG_FORCE_SYSTEM_BINARIES', 'VCPKG_FORCE_DOWNLOADED_BINARIES')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')

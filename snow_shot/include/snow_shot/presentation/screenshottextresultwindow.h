@@ -118,9 +118,9 @@ class ScreenshotTextResultWindow final : public QObject {
     adqt::widgets::AdButton* m_translate = nullptr;
     adqt::widgets::AdButton* m_translationSettings = nullptr;
     bool m_recognizing = false;
-    // Translation state is tracked even in builds without the translation feature; the host
-    // simply never drives it there.
-    bool m_translating = false;
+    // The translate action is busy only while its request runs. The session can stay in its
+    // translation mode afterwards, so the mode must not keep the action spinning.
+    bool m_translateBusy = false;
     bool m_translationAvailable = true;
     bool m_suppressControlSignals = false;
     bool m_shortcutInstalled = false;

@@ -3,14 +3,15 @@
 namespace snow_shot::presentation {
 namespace {
 
+// Platform backends in this namespace also define a `validation` helper. Unity
+// builds merge those translation units, so keep this one named for its purpose.
 GlobalShortcutValidationResult
-validation(const shortcuts::ShortcutBinding& binding, bool supported,
-           GlobalShortcutFailureReason reason = GlobalShortcutFailureReason::None) {
+unsupportedValidation(const shortcuts::ShortcutBinding& binding) {
     GlobalShortcutValidationResult result;
     result.binding = binding;
     result.shortcut = binding.portableText;
-    result.supported = supported;
-    result.failureReason = supported ? GlobalShortcutFailureReason::None : reason;
+    result.supported = false;
+    result.failureReason = GlobalShortcutFailureReason::UnsupportedPlatform;
     return result;
 }
 
@@ -20,7 +21,7 @@ class UnsupportedGlobalShortcutBackend final : public GlobalShortcutBackend {
 
     GlobalShortcutValidationResult
     validateShortcut(const shortcuts::ShortcutBinding& binding) const override {
-        return validation(binding, false, GlobalShortcutFailureReason::UnsupportedPlatform);
+        return unsupportedValidation(binding);
     }
 
     GlobalShortcutBackendResult registerShortcut(int, const shortcuts::ShortcutBinding&) override {

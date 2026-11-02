@@ -54,6 +54,35 @@ function(snow_configure_windows_architecture)
         "Windows release platform selected by the C++ compiler." FORCE)
 endfunction()
 
+function(snow_windows_ninja_directory output)
+    # shaderc-sys builds the bundled shaderc with the CMake Ninja generator when
+    # the OCR worker has no Vulkan SDK, and its build script aborts with
+    # "couldn't find required command: ninja" before CMake is started. Visual
+    # Studio ships Ninja without exporting it, so look it up next to the tools.
+    set(${output} "" PARENT_SCOPE)
+    if(NOT WIN32)
+        return()
+    endif()
+    set(_hints)
+    if(IS_DIRECTORY "$ENV{SNOW_NINJA_DIR}")
+        list(APPEND _hints "$ENV{SNOW_NINJA_DIR}")
+    endif()
+    if(IS_DIRECTORY "$ENV{VSINSTALLDIR}")
+        set(_visual_studio_root "$ENV{VSINSTALLDIR}")
+        cmake_path(NORMAL_PATH _visual_studio_root)
+        cmake_path(APPEND _visual_studio_root "Common7" "IDE" "CommonExtensions"
+            "Microsoft" "CMake" "Ninja" OUTPUT_VARIABLE _visual_studio_ninja)
+        if(IS_DIRECTORY "${_visual_studio_ninja}")
+            list(APPEND _hints "${_visual_studio_ninja}")
+        endif()
+    endif()
+    find_program(SNOW_NINJA_EXECUTABLE NAMES ninja ninja.exe HINTS ${_hints})
+    if(SNOW_NINJA_EXECUTABLE)
+        get_filename_component(_directory "${SNOW_NINJA_EXECUTABLE}" DIRECTORY)
+        set(${output} "${_directory}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 function(snow_windows_rust_environment output target)
     set(_environment)
     if(WIN32 AND MSVC)
@@ -68,6 +97,27 @@ function(snow_windows_rust_environment output target)
             "CC_${_target_key}=${_c_compiler}"
             "CXX_${_target_key}=${CMAKE_CXX_COMPILER}"
             "AR_${_target_key}=${CMAKE_AR}")
+        # A Visual Studio custom build step does not hand the caller's PATH to
+        # the cargo process. shaderc then cannot find Ninja, and its nested CMake
+        # configure cannot find the resource compiler, so both break while the
+        # build script runs. Prepend the configure-time developer PATH one
+        # directory at a time: a single PATH=... argument would be split on its
+        # ';' separators by COMMAND_EXPAND_LISTS.
+        snow_windows_ninja_directory(_ninja_directory)
+        set(_developer_path)
+        if(_ninja_directory)
+            list(APPEND _developer_path "${_ninja_directory}")
+        endif()
+        list(APPEND _developer_path $ENV{PATH})
+        list(REMOVE_DUPLICATES _developer_path)
+        # Later prepends win, so walk the list backwards to keep its order.
+        list(REVERSE _developer_path)
+        foreach(_directory IN LISTS _developer_path)
+            if(_directory)
+                list(APPEND _environment "--modify"
+                    "PATH=path_list_prepend:${_directory}")
+            endif()
+        endforeach()
     endif()
     set(${output} "${_environment}" PARENT_SCOPE)
 endfunction()

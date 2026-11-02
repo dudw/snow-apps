@@ -192,8 +192,10 @@ ScreenshotOcrController::ScreenshotOcrController(ScreenshotOcrControllerContext 
                     m_context.interaction.activeTool() != ScreenshotActiveTool::TextTranslation) {
                     m_context.interaction.setCanvasTool(ScreenshotActiveTool::TextTranslation);
                 }
+                // The translation mode outlives its job, so the result window tracks the request
+                // itself: a finished translation must release its action instead of spinning.
                 if (m_textResultWindow != nullptr)
-                    m_textResultWindow->setTranslating(translating, streaming);
+                    m_textResultWindow->setTranslating(translating && streaming, streaming);
                 if (ScreenshotToolbarWindow* toolbar = m_context.overlayCoordinator.toolbar()) {
                     toolbar->setTextTranslationState(available, translating, streaming, canUndo,
                                                      canRedo, canReset, originalImage);
@@ -507,6 +509,10 @@ void ScreenshotOcrController::activateMode(Mode mode, bool textTranslation,
                                                      : 5;
     if (!snow_shot::app::editionRecognitionModeAvailable(sessionMode))
         return;
+    // The detached result window owns the presentation until it closes; a stale shortcut scope
+    // must not resurrect the capture surfaces behind it.
+    if (m_resultSurfaceActive)
+        return;
     const QRect selection = m_context.selection.pixelSelection();
     if (selection.width() < 1 || selection.height() < 1) {
         if (ScreenshotToolbarWindow* toolbar = m_context.overlayCoordinator.toolbar()) {
@@ -816,6 +822,7 @@ void ScreenshotOcrController::deactivateImpl(bool preserveRecognitionWindow) {
         return;
     }
     m_active = false;
+    m_resultSurfaceActive = false;
     clearOcrBackgroundFromOverlays();
     closeTextResultWindow();
     if (!preserveRecognitionWindow) {
@@ -927,6 +934,10 @@ void ScreenshotOcrController::clearOcrBackgroundFromOverlays() {
 
 bool ScreenshotOcrController::ensureRecognitionWindow() {
     if (m_context.captureState.presentationSuppressed)
+        return false;
+    // While the result window owns the presentation, re-creating the in-capture surface would
+    // paint the recognized text and the original-image preview back onto the desktop.
+    if (m_resultSurfaceActive)
         return false;
     const QRect selection = m_context.selection.pixelSelection();
     const QString key = currentCacheKey();
@@ -1125,7 +1136,10 @@ void ScreenshotOcrController::ensureTextResultWindow() {
                     m_textResultWindow->setTranslationStatus(QString(), false);
                     m_textResultWindow->clearTranslationResult();
                 }
-                m_session->beginTextTranslation();
+                // The action doubles as "translate again" once a result exists, so it must leave
+                // the previous translation mode before the session accepts the new request.
+                // The session reports the request state through setTextTranslationState.
+                m_session->restartTextTranslation();
 #else
                 Q_UNUSED(source)
                 Q_UNUSED(target)
@@ -1221,7 +1235,14 @@ void ScreenshotOcrController::presentTextResultWindow() {
     // The detached surface replaces the capture UI, so the overlay and its toolbar step aside.
     // The capture session itself stays alive: "recognize again" and the image copy still depend
     // on the selection and the cached target.
+    m_resultSurfaceActive = true;
     m_context.hideCapturePresentation();
+    // The in-place recognition surface is its own always-on-top window over the selection, so
+    // hiding the overlays alone would leave the recognized text floating on the desktop. Hiding
+    // it also retires the floating original-image preview it owns. The widget is kept for the
+    // cached surface image instead of being destroyed.
+    if (m_recognitionWindow != nullptr)
+        m_recognitionWindow->hide();
 }
 
 void ScreenshotOcrController::closeTextResultWindow() {

@@ -62,7 +62,7 @@ class WindowsArchitecture(unittest.TestCase):
             script.write_text('cmake_minimum_required(VERSION 3.30)\n' + contents,
                               encoding='utf-8')
             result = subprocess.run([CMAKE, '-P', str(script)], capture_output=True,
-                                    text=True, timeout=30)
+                                    encoding='utf-8', errors='replace', timeout=30)
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         return result.stdout + result.stderr
 
@@ -169,6 +169,33 @@ message(STATUS "ENVIRONMENT=${environment}")
 ''')
         self.assertIn('CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER=C:/VS/bin/Hostx64/arm64/link.exe', output)
         self.assertIn('CC_aarch64_pc_windows_msvc=C:/VS/bin/Hostx64/arm64/cl.exe', output)
+
+    def test_rust_environment_carries_developer_path_for_build_scripts(self):
+        # shaderc's build script and its nested CMake configure need Ninja and
+        # the Windows SDK resource compiler, but a Visual Studio custom build
+        # step only forwards its own PATH.
+        with tempfile.TemporaryDirectory() as directory:
+            ninja = Path(directory) / 'Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja'
+            ninja.mkdir(parents=True)
+            (ninja / 'ninja.exe').write_bytes(b'')
+            output = self.run_cmake(self.fixture('AMD64', f'''
+set(ENV{{VSINSTALLDIR}} "{Path(directory).as_posix()}")
+set(ENV{{SNOW_NINJA_DIR}} "")
+set(ENV{{PATH}} "C:/Windows/system32;C:/Program Files/Windows Kits/10/bin")
+snow_windows_rust_environment(environment "${{target}}")
+string(REPLACE ";" "|" environment "${{environment}}")
+message(STATUS "ENVIRONMENT=${{environment}}")
+'''))
+        environment = re.search(r'ENVIRONMENT=(.*)', output).group(1).split('|')
+        ninja_entry = f'PATH=path_list_prepend:{ninja.as_posix()}'
+        prepends = [entry for entry in environment if entry.startswith('PATH=path_list_prepend:')]
+        self.assertEqual(environment.count('--modify'), len(prepends),
+                         'Every PATH modification must be paired with its operation.')
+        self.assertIn(ninja_entry, environment)
+        self.assertIn('PATH=path_list_prepend:C:/Program Files/Windows Kits/10/bin', environment)
+        self.assertGreater(environment.index(ninja_entry),
+                           environment.index('PATH=path_list_prepend:C:/Windows/system32'),
+                           'Ninja must precede the inherited developer PATH.')
 
     def test_macos_rust_selection_stays_independent(self):
         output = self.run_cmake(f'''

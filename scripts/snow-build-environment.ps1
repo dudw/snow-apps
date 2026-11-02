@@ -374,7 +374,8 @@ function Test-SnowQtSystemCodecKit {
             continue
         }
         $text = if ($feature.Name -ceq "system_png") { $guiText } else { $coreText }
-        $visibility = if ($feature.Name -cin @("timezone", "concurrent")) { "PUBLIC" } else { "PRIVATE" }
+        # zstd is a public Qt feature, unlike the private codec/linkage switches around it.
+        $visibility = if ($feature.Name -cin @("timezone", "concurrent", "zstd")) { "PUBLIC" } else { "PRIVATE" }
         $enabled = if ($feature.Name -ceq "ltcg") {
             $ltcgEnabled
         } elseif ($feature.Name -cin @("system_png", "system_zlib")) {
@@ -648,6 +649,35 @@ function Add-SnowMsvcToolsToPath {
     return $msvcBin
 }
 
+function Get-SnowNinjaSearchDirectory {
+    # Visual Studio ships Ninja beside its CMake copy without exporting that
+    # directory, so look it up from the installation that owns the MSVC tools.
+    $directories = foreach ($root in @(
+            $env:VSINSTALLDIR,
+            $(if (-not [string]::IsNullOrWhiteSpace($env:VCINSTALLDIR)) {
+                    Split-Path -Parent $env:VCINSTALLDIR.TrimEnd('\', '/')
+                })
+        )) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        Join-Path ([System.IO.Path]::GetFullPath($root)) "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja"
+    }
+    return @($directories | Select-Object -Unique)
+}
+
+function Resolve-SnowNinjaExecutable {
+    param([string[]]$SearchDirectory = @())
+
+    $command = Get-Command "ninja.exe" -ErrorAction SilentlyContinue
+    if (-not $command) { $command = Get-Command "ninja" -ErrorAction SilentlyContinue }
+    if ($command -and $command.Source) { return $command.Source }
+    foreach ($directory in @(@($SearchDirectory) + @(Get-SnowNinjaSearchDirectory) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        $candidate = Join-Path $directory "ninja.exe"
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+    return $null
+}
+
 function Set-SnowVcpkgEnvironment {
     $env:VCPKG_ROOT = Join-Path $script:SnowRepoRoot ".tools\vcpkg"
     # Let vcpkg accept installed tools meeting its minimum versions, downloading
@@ -720,6 +750,27 @@ function Set-SnowBuildEnvironment {
         if ($formatDirectory) {
             $env:Path = "$env:Path;$formatDirectory"
         }
+    }
+    # shaderc-sys builds the bundled shaderc through CMake with the Ninja
+    # generator whenever the OCR worker has no Vulkan SDK to link against, and
+    # its build script aborts with "couldn't find required command: ninja"
+    # before CMake even runs. Visual Studio ships Ninja without exporting that
+    # directory, so expose it on PATH for the tools that read it and hand the
+    # directory to CMake, which prepends it to the cargo environment itself.
+    if (-not (Get-Command "ninja.exe" -ErrorAction SilentlyContinue)) {
+        $ninja = Resolve-SnowNinjaExecutable
+        if ($ninja) {
+            $env:Path = "$(Split-Path -Parent $ninja);$env:Path"
+        } else {
+            Write-Warning ("Ninja was not found on PATH or under the Visual Studio installation. " +
+                "The OCR worker builds bundled shaderc with Ninja and will fail until it is available.")
+        }
+    }
+    $ninjaCommand = Get-Command "ninja.exe" -ErrorAction SilentlyContinue
+    if ($ninjaCommand) {
+        $env:SNOW_NINJA_DIR = Split-Path -Parent $ninjaCommand.Source
+    } else {
+        Remove-Item Env:SNOW_NINJA_DIR -ErrorAction SilentlyContinue
     }
     # Launchers and shells sometimes inject PATH under several casings
     # (Path/path/PATH). MSBuild copies the environment into a case-insensitive

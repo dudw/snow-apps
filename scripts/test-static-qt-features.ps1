@@ -218,8 +218,9 @@ QString QWinTimeZonePrivate::displayName(QTimeZone::TimeType timeType,
     }
     $coreTargets = @'
 QT_ENABLED_PUBLIC_FEATURES "static;static_runtime;timezone;concurrent"
-QT_ENABLED_PRIVATE_FEATURES "system_zlib;ltcg;testlib"
-QT_DISABLED_PRIVATE_FEATURES "timezone_locale"
+QT_ENABLED_PRIVATE_FEATURES "pcre2;system_zlib;ltcg;testlib"
+QT_DISABLED_PUBLIC_FEATURES "zstd"
+QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale"
 '@
     $corePath = Join-Path $coreDir "Qt6CoreTargets.cmake"
     Set-Content -LiteralPath $corePath -Value $coreTargets
@@ -300,7 +301,7 @@ QT_DISABLED_PRIVATE_FEATURES "timezone_locale"
         "A development kit must retain Qt Test and Concurrent without Release-only LTCG."
     Set-Content -LiteralPath $stampPath -Value $originalStamp
     $debugTargets = $coreTargets -replace 'system_zlib;ltcg', '' `
-        -replace 'QT_DISABLED_PRIVATE_FEATURES "timezone_locale"', 'QT_DISABLED_PRIVATE_FEATURES "timezone_locale;ltcg;system_zlib"'
+        -replace 'QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale"', 'QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale;ltcg;system_zlib"'
     Set-Content -LiteralPath $corePath -Value $debugTargets
     $guiPath = Join-Path $guiDir "Qt6GuiTargets.cmake"
     Set-Content -LiteralPath $guiPath -Value 'QT_ENABLED_PRIVATE_FEATURES "" QT_DISABLED_PRIVATE_FEATURES "system_png"'
@@ -316,7 +317,7 @@ QT_DISABLED_PRIVATE_FEATURES "timezone_locale"
     Require (-not (Test-SnowQtSystemCodecKit -Qt6Dir $qtDir -Architecture arm64)) `
         'ARM64 must reject installed Qt targets with LTCG enabled.'
     $arm64Targets = $coreTargets -replace ';ltcg', '' `
-        -replace 'QT_DISABLED_PRIVATE_FEATURES "timezone_locale"', 'QT_DISABLED_PRIVATE_FEATURES "timezone_locale;ltcg"'
+        -replace 'QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale"', 'QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale;ltcg"'
     Set-Content -LiteralPath $corePath -Value $arm64Targets
     Require (Test-SnowQtSystemCodecKit -Qt6Dir $qtDir -Architecture arm64) `
         'ARM64 Release must retain system codecs while disabling LTCG.'
@@ -428,7 +429,7 @@ QT_DISABLED_PRIVATE_FEATURES "timezone_locale"
         ($coreTargets -replace 'static;static_runtime;timezone', 'static;static_runtime'),
         ($coreTargets -replace 'system_zlib;ltcg', 'system_zlib_extra;ltcg'),
         ($coreTargets -replace 'system_zlib;ltcg', 'system_zlib;ltcg;timezone_locale'),
-        ($coreTargets -replace 'QT_DISABLED_PRIVATE_FEATURES "timezone_locale"', 'QT_DISABLED_PRIVATE_FEATURES ""')
+        ($coreTargets -replace 'QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale"', 'QT_DISABLED_PRIVATE_FEATURES ""')
     )) {
         Set-Content -LiteralPath $corePath -Value $invalidTargets
         Require (-not (Test-SnowValidatedStaticQtKit $qtDir)) "Bootstrap trusted a stamp with conflicting installed features."
@@ -469,7 +470,7 @@ QT_DISABLED_PRIVATE_FEATURES "timezone_locale"
         "Development and performance kits do not require the production stamp."
     Set-Content -LiteralPath (Join-Path $coreDir "Qt6CoreTargets-debug.cmake") -Value "# fixture"
     Set-Content -LiteralPath $corePath -Value ($coreTargets -replace 'system_zlib;ltcg',
-        'system_zlib;ltcg;timezone_locale' -replace 'QT_DISABLED_PRIVATE_FEATURES "timezone_locale"',
+        'system_zlib;ltcg;timezone_locale' -replace 'QT_DISABLED_PRIVATE_FEATURES "system_pcre2;timezone_locale"',
         'QT_DISABLED_PRIVATE_FEATURES ""')
     Require ((Resolve-SnowQtDir -Qt6Dir $qtDir -Preset windows-msvc-debug) -eq $qtDir) `
         "Existing Debug kits with CLDR name data must remain usable."

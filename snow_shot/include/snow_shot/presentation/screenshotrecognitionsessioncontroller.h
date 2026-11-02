@@ -165,6 +165,9 @@ class ScreenshotRecognitionSessionController final : public QObject {
 
     void beginTextEditing();
     void beginTextTranslation();
+    // Runs the translation again against the current language preferences, leaving the finished
+    // translation mode first when the session is still in it.
+    void restartTextTranslation();
     [[nodiscard]] bool activateCachedTextTranslation();
     void synchronizeUiState() const;
     void endTextEditing();

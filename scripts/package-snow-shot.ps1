@@ -408,7 +408,6 @@ if (-not $installDirectory.StartsWith($artifactPrefix, [System.StringComparison]
 
 $staticVcpkgInstalledRoot = $windowsTarget.InstalledRoot
 $staticVcpkgPrefix = Join-Path $staticVcpkgInstalledRoot $windowsTarget.Triplet
-Assert-SnowShotStaticDependencies -InstalledRoot $staticVcpkgInstalledRoot -Prefix $staticVcpkgPrefix -Architecture $Architecture
 $qtPrefix = [System.IO.Path]::GetFullPath((Join-Path $buildEnvironment.Qt6Dir "..\..\.."))
 $qtStamp = Get-ValidatedStaticQtStamp -Prefix $qtPrefix `
     -ExpectedVersion $script:SnowQtVersion -ExpectedConfiguration "Release" -Architecture $Architecture
@@ -445,6 +444,11 @@ if (-not $SkipBuild) {
 elseif (-not (Test-Path -LiteralPath $cachePath)) {
     throw "CMake cache was not found: $cachePath"
 }
+
+# The configure step runs the manifest install that produces the audited FFmpeg prefix, so the
+# audit can only run afterwards. Checking it earlier failed on any tree whose dependencies were
+# not installed yet, before the step that installs them had a chance to run.
+Assert-SnowShotStaticDependencies -InstalledRoot $staticVcpkgInstalledRoot -Prefix $staticVcpkgPrefix -Architecture $Architecture
 
 $requiredCacheEntries = @(
     "SNOW_APPS_BUILD_TESTS:BOOL=OFF",

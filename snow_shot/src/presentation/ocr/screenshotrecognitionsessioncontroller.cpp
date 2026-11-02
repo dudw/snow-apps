@@ -2053,6 +2053,24 @@ void ScreenshotRecognitionSessionController::beginTextTranslation() {
 #endif
 }
 
+void ScreenshotRecognitionSessionController::restartTextTranslation() {
+#if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
+    if (!m_active || m_mode != Mode::Text || !hasTextResult()) {
+        return;
+    }
+    // A finished translation leaves the session in translation mode, and beginTextTranslation()
+    // ignores requests while it is on. Leaving that mode is what lets the same action run again
+    // with the languages the user just picked.
+    if (m_translating) {
+        endTextEditing();
+    }
+    if (!notify(&ScreenshotRecognitionSessionController::invalidateCurrentTranslation, false))
+        return;
+    if (!notify(&ScreenshotRecognitionSessionController::beginTextTranslation))
+        return;
+#endif
+}
+
 bool ScreenshotRecognitionSessionController::activateCachedTextTranslation() {
 #if SNOW_SHOT_ENABLE_TEXT_TRANSLATION
     if (!m_active || m_mode != Mode::Text || m_independentEditing || m_externalTextResultHost) {
@@ -3844,8 +3862,10 @@ void ScreenshotRecognitionSessionController::updateOriginalImagePreview() const 
     // The default image describes the screenshot selection. Embedded hosts can
     // provide their displayed image and viewport mapping without replacing it.
     m_content->setOriginalImagePreviewSource(m_target.image, m_target.canvasRect);
+    // A host that renders the result in its own window already shows the captured image beside
+    // the text, so the floating preview would only duplicate it on the desktop.
     m_content->setOriginalImagePreviewEnabled(
-        !m_independentEditing &&
+        !m_independentEditing && !m_externalTextResultHost &&
         snow_shot::storage::TextRecognitionSettings().showOriginalImagePreview());
 }
 

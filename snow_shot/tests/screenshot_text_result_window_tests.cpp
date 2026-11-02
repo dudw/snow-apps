@@ -6,9 +6,11 @@
 #include <QApplication>
 #include <QFontDatabase>
 #include <QImage>
+#include <QScrollArea>
 #include <QWidget>
 
 #include <cstdio>
+#include <cstdlib>
 #include <optional>
 
 namespace {
@@ -138,6 +140,64 @@ void layoutContract() {
     require(body->mapTo(overlay, QPoint(0, 0)).y() < 100,
             "the content area starts right below the title");
 }
+
+// The settings column is a fixed-width sidebar. A proportional split used to squeeze it until
+// the translate action and the language selects slid out of the scroll viewport, hiding their
+// right halves behind a horizontal scroll bar that never revealed them correctly.
+void settingsColumnContract() {
+    ScreenshotTextResultWindow window;
+    window.present(nullptr, QImage(640, 400, QImage::Format_ARGB32));
+    QCoreApplication::processEvents();
+
+    QWidget* surface = window.windowWidget();
+    if (surface == nullptr)
+        return;
+    auto* scroll = surface->findChild<QScrollArea*>(
+        QStringLiteral("screenshotTextResultScroll"));
+    auto* translate = surface->findChild<adqt::widgets::AdButton*>(
+        QStringLiteral("screenshotTextResultTranslate"));
+    require(scroll != nullptr, "the settings column exists");
+    require(translate != nullptr, "the translate action exists in the settings column");
+    if (scroll == nullptr || translate == nullptr || !translate->isVisible())
+        return;
+
+    const QRect viewport = scroll->viewport()->rect();
+    const QRect action(translate->mapTo(scroll->viewport(), QPoint(0, 0)), translate->size());
+    require(viewport.contains(action), "the translate action stays inside the settings column");
+}
+
+// The preview canvas is plain grey around the captured image. It used to inherit a translucent
+// theme fill through a style sheet, which Qt turned into opaque black behind the screenshot.
+void previewCanvas() {
+    ScreenshotTextResultWindow window;
+    QImage image(320, 200, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    window.present(nullptr, image);
+    QCoreApplication::processEvents();
+
+    QWidget* surface = window.windowWidget();
+    if (surface == nullptr)
+        return;
+    QWidget* preview = surface->findChild<QWidget*>(QStringLiteral("screenshotTextResultPreview"));
+    require(preview != nullptr, "the preview view exists");
+    if (preview == nullptr || preview->size().isEmpty())
+        return;
+
+    const QImage grabbed = preview->grab().toImage();
+    require(!grabbed.isNull(), "the preview renders an image");
+    if (grabbed.isNull())
+        return;
+
+    const QColor canvas = grabbed.pixelColor(grabbed.width() - 2, 2);
+    require(canvas.red() > 0x60 && canvas.red() < 0xE0 &&
+                std::abs(canvas.red() - canvas.green()) < 12 &&
+                std::abs(canvas.green() - canvas.blue()) < 12,
+            "the canvas around the captured image is neutral grey");
+
+    const QColor center = grabbed.pixelColor(grabbed.width() / 2, grabbed.height() / 2);
+    require(center.red() > 0xF0 && center.green() > 0xF0 && center.blue() > 0xF0,
+            "the captured image covers the fitted centre");
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -153,5 +213,7 @@ int main(int argc, char** argv) {
     styles::ThemeManager::instance().initialize(app);
     contracts();
     layoutContract();
+    settingsColumnContract();
+    previewCanvas();
     return failures == 0 ? 0 : 1;
 }

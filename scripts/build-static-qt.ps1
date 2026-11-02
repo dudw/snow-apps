@@ -10,6 +10,7 @@ param(
     [ValidateSet("Debug", "Release")][string]$Configuration = "Release",
     [string]$QtMirrorBaseUrl = "https://qt.mirror.constant.com/official_releases",
     [ValidateRange(1, 256)][int]$Parallelism = 4,
+    [ValidateSet("Auto", "Ninja", "NMake Makefiles", "Visual Studio 18 2026")][string]$CmakeGenerator = "Auto",
     [switch]$DevelopmentModules,
     [switch]$Force
 )
@@ -44,6 +45,63 @@ function Invoke-Checked {
     }
     finally {
         Pop-Location
+    }
+}
+
+function Get-NinjaProgram {
+    $command = Get-Command "ninja.exe" -ErrorAction SilentlyContinue
+    $candidates = @(@(
+            $(if ($command) { $command.Source }),
+            $(if (-not [string]::IsNullOrWhiteSpace($env:VSINSTALLDIR)) {
+                Join-Path $env:VSINSTALLDIR `
+                    "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+            })
+        ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+            ForEach-Object { [System.IO.Path]::GetFullPath([string]$_) } |
+            Select-Object -Unique)
+    if ($candidates.Count -gt 0) { return $candidates[0] }
+    return ""
+}
+
+function Get-CMakeGeneratorCandidates {
+    # Ordered by preference. Ninja is Qt's officially supported generator and the fastest; the
+    # Visual Studio generator writes .sln/.vcxproj and shares no generated include chain with the
+    # Makefile-style generators, so it survives hosts where Ninja/NMake lose their
+    # CMakeFiles payload; NMake is the last resort.
+    param([Parameter(Mandatory = $true)]
+        [ValidateSet("Auto", "Ninja", "NMake Makefiles", "Visual Studio 18 2026")][string]$Preference)
+
+    $ninja = Get-NinjaProgram
+    $nmake = Get-Command "nmake.exe" -ErrorAction SilentlyContinue
+    $nmakeProgram = if ($nmake) { [System.IO.Path]::GetFullPath($nmake.Source) } else { "" }
+    $visualStudio = [pscustomobject]@{ Name = "Visual Studio 18 2026"; Program = "" }
+
+    switch ($Preference) {
+        "Ninja" {
+            if (-not $ninja) {
+                throw ("Ninja was not found. Visual Studio ships one under " +
+                    "'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'.")
+            }
+            return @([pscustomobject]@{ Name = "Ninja"; Program = $ninja })
+        }
+        "NMake Makefiles" {
+            if (-not $nmakeProgram) { throw "nmake.exe was not found on PATH." }
+            return @([pscustomobject]@{ Name = "NMake Makefiles"; Program = $nmakeProgram })
+        }
+        "Visual Studio 18 2026" {
+            return @($visualStudio)
+        }
+        default {
+            $candidates = @()
+            if ($ninja) {
+                $candidates += [pscustomobject]@{ Name = "Ninja"; Program = $ninja }
+            }
+            $candidates += $visualStudio
+            if ($nmakeProgram) {
+                $candidates += [pscustomobject]@{ Name = "NMake Makefiles"; Program = $nmakeProgram }
+            }
+            return $candidates
+        }
     }
 }
 
@@ -496,6 +554,365 @@ function Assert-CacheEntry {
     }
 }
 
+function Get-ProbeTreeSummary {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$MaxEntries = 60
+    )
+
+    $summary = @()
+    $entries = @(Get-ChildItem -LiteralPath $Path -Force -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            Select-Object -First $MaxEntries)
+    foreach ($entry in $entries) {
+        $relative = $entry.FullName.Substring([Math]::Min($Path.Length + 1, $entry.FullName.Length))
+        if ($entry.PSIsContainer) {
+            $summary += "  dir  $relative"
+        }
+        else {
+            $summary += ("  file {0,8}  {1}" -f $entry.Length, $relative)
+        }
+    }
+    if ($entries.Count -ge $MaxEntries) {
+        $summary += "  ... (truncated)"
+    }
+    return $summary
+}
+
+function Test-AtomicFileReplaceSupport {
+    # CMake lands rules.ninja and InstallScripts.json by writing "name.tmp" and renaming it into
+    # place (so an unchanged file keeps its mtime and nothing rebuilds), and it silently keeps
+    # nothing when that rename fails. Reproduce exactly that sequence, so a filesystem filter
+    # (antivirus, DLP encryption, a sync client) shows up as a plain boolean instead of a file
+    # that is mysteriously absent from CMake's own scratch directory.
+    param([Parameter(Mandatory = $true)][string]$Directory)
+
+    $probeDirectory = Join-Path $Directory ("atomic-replace-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    $result = [ordered]@{
+        Directory = $probeDirectory
+        CreateTemp = $false
+        RenameIntoTarget = $false
+        ReplaceExisting = $false
+        SurvivesDwell = $false
+        Error = ""
+    }
+    try {
+        New-Item -ItemType Directory -Force -Path $probeDirectory | Out-Null
+        $tempPath = Join-Path $probeDirectory "rules.ninja.tmp"
+        $targetPath = Join-Path $probeDirectory "rules.ninja"
+        # Realistic ninja rule text rather than a two-word file: a scanner that treats build-rule
+        # content differently only shows up if the payload looks like what CMake writes.
+        $sample = (@(
+                "# CMAKE generated file: DO NOT EDIT!"
+                "# Generated by `"Ninja`" Generator, CMake Version 4.4"
+                "rule CXX_COMPILER__snow_cmake_generator_probe_unscanned_Release"
+                "  command = $($env:VCToolsInstallDir)bin\Hostx64\x64\cl.exe /nologo /TP /Fo CMakeFiles\snow_cmake_generator_probe.dir\main.cpp.obj /Fd CMakeFiles\snow_cmake_generator_probe.dir\ /FS -c main.cpp"
+                "  description = Building CXX object CMakeFiles/snow_cmake_generator_probe.dir/main.cpp.obj"
+                "  deps = msvc"
+                "rule CXX_EXECUTABLE_LINKER__snow_cmake_generator_probe_Release"
+                "  command = $($env:VCToolsInstallDir)bin\Hostx64\x64\link.exe /nologo @CMakeFiles\snow_cmake_generator_probe.dir\objects1.rsp /out:snow_cmake_generator_probe.exe /implib:snow_cmake_generator_probe.lib /pdb:snow_cmake_generator_probe.pdb /machine:x64 /INCREMENTAL:NO /subsystem:console"
+                "  description = Linking CXX executable snow_cmake_generator_probe.exe"
+            ) -join "`r`n")
+        $sample = $sample + ("`r`n# " + ("padding " * 260))
+        Set-Content -LiteralPath $tempPath -Value $sample -Encoding utf8
+        $result.CreateTemp = Test-Path -LiteralPath $tempPath
+        [System.IO.File]::Move($tempPath, $targetPath)
+        $result.RenameIntoTarget = (Test-Path -LiteralPath $targetPath) -and
+            ((Get-Item -LiteralPath $targetPath).Length -gt 1000)
+        Set-Content -LiteralPath $tempPath -Value ($sample + "`r`n# second") -Encoding utf8
+        [System.IO.File]::Move($tempPath, $targetPath, $true)
+        $result.ReplaceExisting = (Get-Item -LiteralPath $targetPath).Length -gt 1000
+        # A real-time scanner acts shortly after the file appears, so give it the chance to swallow
+        # the file and check again: a build-rule file full of cl.exe/link.exe command lines is
+        # exactly the shape some engines quarantine.
+        Start-Sleep -Milliseconds 600
+        $result.SurvivesDwell = (Test-Path -LiteralPath $targetPath -PathType Leaf) -and
+            ((Get-Item -LiteralPath $targetPath).Length -gt 1000)
+    }
+    catch {
+        $result.Error = $_.Exception.Message
+    }
+    # Leave the directory as it was found.
+    foreach ($created in @($tempPath, $targetPath)) {
+        if ($created -and (Test-Path -LiteralPath $created -PathType Leaf)) {
+            Remove-Item -LiteralPath $created -Force -ErrorAction SilentlyContinue
+        }
+    }
+    return [pscustomobject]$result
+}
+
+function Get-AlternativeCMakeCandidates {
+    param([Parameter(Mandatory = $true)][string]$CurrentCMake)
+
+    # The cmake from Scoop and the one bundled with Visual Studio are independent builds of
+    # different versions. When one of them cannot generate a build system on a host, the other
+    # very often can, so both are tried before giving up.
+    $candidates = @(
+        $(if (-not [string]::IsNullOrWhiteSpace($env:VSINSTALLDIR)) {
+            Join-Path $env:VSINSTALLDIR `
+                "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+        })
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        ForEach-Object { [System.IO.Path]::GetFullPath([string]$_) } |
+        Where-Object { -not $_.Equals($CurrentCMake, [System.StringComparison]::OrdinalIgnoreCase) } |
+        Select-Object -Unique
+    return @($candidates)
+}
+
+function Invoke-CMakeGeneratorProbe {
+    param(
+        [Parameter(Mandatory = $true)][string]$CMakeCommand,
+        [Parameter(Mandatory = $true)][string]$ProbeDirectory,
+        [Parameter(Mandatory = $true)]$Generator,
+        [Parameter(Mandatory = $true)][string]$LogPath
+    )
+
+    $probeSource = Join-Path $ProbeDirectory "src"
+    $probeBuild = Join-Path $ProbeDirectory "build"
+    New-Item -ItemType Directory -Force -Path $probeSource | Out-Null
+    Set-Content -LiteralPath (Join-Path $probeSource "CMakeLists.txt") -Encoding utf8 -Value @(
+        "cmake_minimum_required(VERSION 3.21)"
+        "project(snow_cmake_generator_probe CXX)"
+        "add_executable(snow_cmake_generator_probe main.cpp)"
+    )
+    Set-Content -LiteralPath (Join-Path $probeSource "main.cpp") -Encoding utf8 `
+        -Value "int main() { return 0; }"
+
+    $probeArguments = @(
+        # --debug-trycompile keeps the nested try-compile project on disk. That nested project is
+        # exactly whose CMakeFiles payload goes missing when this probe fails, and CMake deletes it
+        # once the try_compile returns, leaving nothing to look at.
+        "--debug-trycompile",
+        "-S", $probeSource,
+        "-B", $probeBuild,
+        "-G", $Generator.Name,
+        "-DCMAKE_BUILD_TYPE=$Configuration",
+        "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"
+    )
+    if ($Generator.Program) {
+        $probeArguments += "-DCMAKE_MAKE_PROGRAM=$($Generator.Program)"
+    }
+    if ($Generator.Name -like "Visual Studio*") {
+        # The project's own presets select the same architecture and host toolset; without them
+        # the Visual Studio generator reports "No CMAKE_CXX_COMPILER could be found".
+        $visualStudioArchitecture = if ($Architecture -eq "arm64") { "ARM64" } else { "x64" }
+        $probeArguments += @("-A", $visualStudioArchitecture, "-T", "host=x64")
+        if (-not [string]::IsNullOrWhiteSpace($env:VSINSTALLDIR)) {
+            $probeArguments += "-DCMAKE_GENERATOR_INSTANCE=$env:VSINSTALLDIR"
+        }
+    }
+    & $CMakeCommand @probeArguments *> $LogPath
+    if ($LASTEXITCODE -ne 0) {
+        return $false
+    }
+    & $CMakeCommand "--build" $probeBuild "--config" $Configuration *>> $LogPath
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Select-CMakeGenerator {
+    # Runs a three-line C++ project through every candidate generator and cmake build, in
+    # preference order, and returns the first combination that both configures and builds.
+    # That is what makes this script survive a host where one generator cannot produce a usable
+    # build system (the symptom is 'CMakeFiles\rules.ninja' or 'CMakeFiles\cmTC_*.dir\build.make'
+    # reported missing), and it turns a three-minute Qt configure failure into a ten-second probe.
+    param(
+        [Parameter(Mandatory = $true)][string]$BuildDirectory,
+        [Parameter(Mandatory = $true)][string]$Preference
+    )
+
+    $generators = @(Get-CMakeGeneratorCandidates -Preference $Preference)
+    $probeRoot = Join-Path $BuildDirectory ".cmake-generator-probe"
+    if (Test-Path -LiteralPath $probeRoot) {
+        Remove-Item -LiteralPath $probeRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $probeRoot | Out-Null
+
+    $primaryCMake = [System.IO.Path]::GetFullPath((Get-Command cmake).Source)
+    $cmakes = @($primaryCMake) + @(Get-AlternativeCMakeCandidates -CurrentCMake $primaryCMake)
+
+    $results = @()
+    $index = 0
+    foreach ($generator in $generators) {
+        foreach ($cmake in $cmakes) {
+            $index++
+            $name = "attempt{0}" -f $index
+            $probeDirectory = Join-Path $probeRoot $name
+            $logPath = Join-Path $probeRoot "$name.log"
+            # Put this cmake first on PATH for its own attempt: CMake re-enters itself for some
+            # nested steps by name, so an attempt is only representative if its own bin directory
+            # wins the lookup.
+            $env:Path = "$(Split-Path -Parent $cmake);$env:Path"
+            $succeeded = $false
+            try {
+                $succeeded = Invoke-CMakeGeneratorProbe -CMakeCommand $cmake `
+                    -ProbeDirectory $probeDirectory -Generator $generator -LogPath $logPath
+            }
+            catch {
+                Add-Content -LiteralPath $logPath -Value $_.Exception.Message `
+                    -Encoding utf8 -ErrorAction SilentlyContinue
+            }
+            $results += [pscustomobject]@{
+                Name = $name
+                Generator = $generator
+                CMake = $cmake
+                Directory = $probeDirectory
+                Log = $logPath
+                Succeeded = $succeeded
+            }
+            if ($succeeded) {
+                Remove-Item -LiteralPath $probeRoot -Recurse -Force -ErrorAction SilentlyContinue
+                return $generator
+            }
+        }
+    }
+
+    $report = @(
+        "No available cmake can configure and build a three-line C++ program with any of the " +
+        "tried generators: $(($generators | ForEach-Object { $_.Name }) -join ', ').",
+        "The same failure shows up inside Qt as 'CMakeFiles\rules.ninja' or " +
+        "'CMakeFiles\cmTC_*.dir\build.make' not found, so this has to be fixed first.",
+        "",
+        "Attempts:"
+    )
+    foreach ($result in $results) {
+        $report += "  $($result.Name): $($result.Generator.Name) via $($result.CMake)"
+    }
+    $report += ""
+    $report += "Probe root: $probeRoot"
+    $report += ""
+    $report += "Environment variables that change how CMake drives the toolchain:"
+    foreach ($name in @("CMAKE_GENERATOR", "CMAKE_MAKE_PROGRAM", "CMAKE_ROOT", "CMAKE_PREFIX_PATH",
+            "CMAKE_TOOLCHAIN_FILE", "NINJA", "NINJA_STATUS", "MAKE", "MAKEFLAGS", "CL", "_CL_",
+            "TMP", "TEMP", "VSLANG", "INCLUDE", "LIB", "VCINSTALLDIR", "VSINSTALLDIR")) {
+        $value = [System.Environment]::GetEnvironmentVariable($name)
+        if (-not [string]::IsNullOrEmpty($value)) {
+            $report += ("  {0}={1}" -f $name, $value)
+        }
+    }
+    $pathEntries = @($env:Path -split ";" | Where-Object { $_ })
+    $report += ("  Path entries: {0}; first three: {1}" -f $pathEntries.Count,
+        (($pathEntries | Select-Object -First 3) -join " | "))
+
+    $atomicWrite = Test-AtomicFileReplaceSupport -Directory $probeRoot
+    $report += ""
+    $report += "Atomic write test (the temp-file + rename that CMake uses for rules.ninja):"
+    $report += ("  create name.tmp: {0}; rename into place: {1}; replace existing file: {2}; " +
+        "still there after 600 ms: {3}" -f $atomicWrite.CreateTemp, $atomicWrite.RenameIntoTarget,
+        $atomicWrite.ReplaceExisting, $atomicWrite.SurvivesDwell)
+    if ($atomicWrite.Error) {
+        $report += ("  error: " + $atomicWrite.Error)
+    }
+    if (-not ($atomicWrite.CreateTemp -and $atomicWrite.RenameIntoTarget -and
+            $atomicWrite.ReplaceExisting -and $atomicWrite.SurvivesDwell)) {
+        $report += ("  => Something on this machine blocks the rename that CMake relies on. Add an " +
+            "exclusion for $BuildDirectory (and the Qt source directory) in the antivirus, DLP or " +
+            "sync client, or build on a volume that is not filtered, then rerun.")
+    }
+    else {
+        $report += ("  The rename itself works here, so the loss happens somewhere else; the tree " +
+            "below is the primary evidence.")
+    }
+
+    $fileSystemFilters = @()
+    $servicesKey = "HKLM:\SYSTEM\CurrentControlSet\Services"
+    if (Test-Path -LiteralPath $servicesKey) {
+        $fileSystemFilters = @(Get-ChildItem -LiteralPath $servicesKey -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    $properties = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+                    if (-not $properties) { return }
+                    $typeProperty = $properties.PSObject.Properties["Type"]
+                    $groupProperty = $properties.PSObject.Properties["Group"]
+                    $displayProperty = $properties.PSObject.Properties["DisplayName"]
+                    if (-not $typeProperty -or -not $groupProperty) { return }
+                    if ($typeProperty.Value -ne 2 -or "$($groupProperty.Value)" -notlike "FSFilter*") {
+                        return
+                    }
+                    $display = if ($displayProperty) { $displayProperty.Value } else { "" }
+                    "{0}  [{1}]  {2}" -f $_.PSChildName, $groupProperty.Value, $display
+                } | Sort-Object)
+    }
+    $report += ""
+    $report += "Filesystem filter drivers loaded on this machine (the suspects when writes vanish):"
+    if ($fileSystemFilters.Count -gt 0) {
+        $report += @($fileSystemFilters | Select-Object -First 30 | ForEach-Object { "  $_" })
+    }
+    else {
+        $report += "  (none could be enumerated)"
+    }
+
+    foreach ($result in $results) {
+        $report += ""
+        $report += "=== $($result.Name): $($result.Generator.Name) via $($result.CMake) ==="
+        $probeBuild = Join-Path $result.Directory "build"
+        if (Test-Path -LiteralPath (Join-Path $probeBuild "CMakeFiles") -PathType Container) {
+            $report += "The probe build tree does contain a CMakeFiles directory."
+        }
+        else {
+            $report += "The probe build tree has NO CMakeFiles directory."
+        }
+        $scratchRoot = Join-Path $probeBuild "CMakeFiles\CMakeScratch"
+        $scratchProjects = @()
+        if (Test-Path -LiteralPath $scratchRoot -PathType Container) {
+            $scratchProjects = @(Get-ChildItem -LiteralPath $scratchRoot -Directory -Force `
+                    -ErrorAction SilentlyContinue)
+        }
+        if ($scratchProjects.Count -gt 0) {
+            $report += "Kept try-compile project(s):"
+            foreach ($project in $scratchProjects) {
+                $report += "  $($project.Name)"
+                $rulesFile = Join-Path $project.FullName "CMakeFiles\rules.ninja"
+                if ($result.Generator.Name -eq "Ninja") {
+                    if (Test-Path -LiteralPath $rulesFile -PathType Leaf) {
+                        $report += "  CMakeFiles\rules.ninja IS present in this project."
+                    }
+                    else {
+                        $report += ("  CMakeFiles\rules.ninja is MISSING from this project, while " +
+                            "build.ninja (which includes it) is there.")
+                        $scratchCMakeFiles = Split-Path -Parent $rulesFile
+                        $report += ("  Leftover temp files in that directory: " + (@(
+                                    Get-ChildItem -LiteralPath $scratchCMakeFiles -Force `
+                                        -Filter "rules.ninja*" -ErrorAction SilentlyContinue |
+                                        ForEach-Object { $_.Name }) -join ", "))
+                        if (Test-Path -LiteralPath $scratchCMakeFiles -PathType Container) {
+                            try {
+                                $acl = Get-Acl -LiteralPath $scratchCMakeFiles
+                                $report += ("  ACL owner: {0}; rules: {1}" -f $acl.Owner,
+                                    (($acl.Access | Select-Object -First 6 |
+                                            ForEach-Object { "$($_.IdentityReference):$($_.FileSystemRights):$($_.AccessControlType)" }) -join " | "))
+                            }
+                            catch {
+                                $report += ("  ACL could not be read: " + $_.Exception.Message)
+                            }
+                            $insideTest = Test-AtomicFileReplaceSupport -Directory $scratchCMakeFiles
+                            $report += ("  Same atomic write test inside {0}:" -f $scratchCMakeFiles)
+                            $report += ("    create rules.ninja.tmp: {0}; rename to rules.ninja: {1}; " +
+                                "replace it: {2}; still there after 600 ms: {3}" -f
+                                $insideTest.CreateTemp, $insideTest.RenameIntoTarget,
+                                $insideTest.ReplaceExisting, $insideTest.SurvivesDwell)
+                            if ($insideTest.Error) {
+                                $report += ("    error: " + $insideTest.Error)
+                            }
+                        }
+                    }
+                }
+                $report += Get-ProbeTreeSummary -Path $project.FullName -MaxEntries 60
+            }
+        }
+        else {
+            $report += "No try-compile project survived; the scratch directory is empty."
+        }
+        $report += "Probe tree:"
+        $report += Get-ProbeTreeSummary -Path $result.Directory -MaxEntries 60
+        if (Test-Path -LiteralPath $result.Log -PathType Leaf) {
+            $report += "Log head:"
+            $report += @(Get-Content -LiteralPath $result.Log -TotalCount 20 | ForEach-Object { "  $_" })
+            $report += "Log tail:"
+            $report += @(Get-Content -LiteralPath $result.Log -Tail 20 | ForEach-Object { "  $_" })
+        }
+    }
+    throw ($report -join [Environment]::NewLine)
+}
+
 if ([string]::IsNullOrWhiteSpace($DependencyPrefix)) {
     $releaseTarget = Get-SnowWindowsTarget -Architecture $Architecture
     $DependencyPrefix = Join-Path $releaseTarget.InstalledRoot $releaseTarget.Triplet
@@ -524,12 +941,23 @@ $workRoot = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
 else {
     [System.IO.Path]::GetTempPath()
 }
+# The build tree deliberately lives outside %TEMP%: temp cleaners and security software prune or
+# block generated files there, which shows up as CMake writing build.ninja / Makefile without the
+# CMakeFiles payload they include ("loading 'CMakeFiles\rules.ninja': The system cannot find the
+# file specified", or NMake's "cannot find file CMakeFiles\cmTC_*.dir\build.make"). A short
+# in-repo path also keeps the longest object paths far below CMAKE_OBJECT_PATH_MAX.
+$buildRoot = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
+    $workRoot
+}
+else {
+    Join-Path $repoRoot ".tools/qt-build"
+}
 if ([string]::IsNullOrWhiteSpace($SourceDirectory)) {
     $SourceDirectory = Join-Path $workRoot "snow-qt-$QtVersion-$Architecture/qt-everywhere-src-$QtVersion"
 }
 $sourceDirectory = [System.IO.Path]::GetFullPath($SourceDirectory)
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
-    $BuildDirectory = Join-Path $workRoot "qt-build-$QtVersion-$Architecture-static-system-codecs-no-timezone-locale-$($Configuration.ToLowerInvariant())"
+    $BuildDirectory = Join-Path $buildRoot "$QtVersion-$Architecture-$($Configuration.ToLowerInvariant())"
 }
 $buildDirectory = [System.IO.Path]::GetFullPath($BuildDirectory)
 
@@ -593,6 +1021,21 @@ $ltcgEnabled = Get-SnowStaticQtLtcgEnabled -Configuration $Configuration -Archit
 $ltcgArgument = if ($ltcgEnabled) { "-ltcg" } else { "-no-ltcg" }
 $zlibArgument = if ($Configuration -eq "Debug") { "-qt-zlib" } else { "-system-zlib" }
 $pngArgument = if ($Configuration -eq "Debug") { "-qt-libpng" } else { "-system-libpng" }
+# Two third-party libraries must never be resolved from the ambient PATH. A conda install once
+# sat on PATH during configure, so Qt happily linked conda's pcre2-16.lib and zstd.lib import
+# libraries; the "static" kit then needed pcre2-16.dll and zstd.dll at run time, which makes the
+# build impossible to ship. Qt ships PCRE2 in tree, so pin that one to Qt's own copy. Qt 6.12 has
+# no bundled zstd at all (qtbase/src/3rdparty has no zstd directory, and qt_find_package(WrapZSTD)
+# only ever looks for an external install), and the vcpkg static triplet does not provide it, so
+# the feature is disabled instead: it only backs zstd-compressed .rcc payloads, the mimetype
+# database, and zstd Content-Encoding in QtNetwork, none of which this application uses.
+$pcreArgument = "-qt-pcre"
+$zstdArgument = "-no-feature-zstd"
+New-Item -ItemType Directory -Force -Path $buildDirectory | Out-Null
+$buildGenerator = Select-CMakeGenerator -Preference $CmakeGenerator -BuildDirectory $buildDirectory
+Write-Output ("Configuring static Qt $QtVersion ($Configuration) with the " +
+    "$($buildGenerator.Name) generator$(if ($buildGenerator.Program) { " at $($buildGenerator.Program)" }), " +
+    "build tree $buildDirectory.")
 $archivePath = Join-Path ([System.IO.Path]::GetDirectoryName($sourceDirectory)) "qt-everywhere-src-$QtVersion.tar.xz"
 $sourceRelativePath = "qt/$($QtVersion.Substring(0, $QtVersion.LastIndexOf('.')))/$QtVersion/single/qt-everywhere-src-$QtVersion.tar.xz"
 # Mirrors are given either as a download.qt.io root mirror (e.g. the Tsinghua or
@@ -668,7 +1111,15 @@ if ($refreshLicenseBundleOnly) {
     exit 0
 }
 
-New-Item -ItemType Directory -Force -Path $buildDirectory | Out-Null
+# The Visual Studio generator locates MSBuild itself, so there is no build tool to pin there.
+$generatorProgramArguments = if ($buildGenerator.Program) {
+    @("-DCMAKE_MAKE_PROGRAM=$($buildGenerator.Program)")
+}
+else { @() }
+if ($buildGenerator.Name -like "Visual Studio*" -and
+    -not [string]::IsNullOrWhiteSpace($env:VSINSTALLDIR)) {
+    $generatorProgramArguments += "-DCMAKE_GENERATOR_INSTANCE=$env:VSINSTALLDIR"
+}
 $configureArguments = @(
     "-static",
     $configurationArgument,
@@ -676,6 +1127,8 @@ $configureArguments = @(
     $ltcgArgument,
     $zlibArgument,
     $pngArgument,
+    $pcreArgument,
+    $zstdArgument,
     "-no-opengl",
     "-no-feature-androiddeployqt",
     "-no-feature-wasmdeployqt",
@@ -690,6 +1143,10 @@ $configureArguments = @(
     "-skip", "qtshadertools",
     "-nomake", "tests",
     "-nomake", "examples",
+    # Pin the generator instead of letting configure auto-detect one: without this Qt falls back
+    # to whatever make tool happens to be first on PATH (it picked "MinGW Makefiles" on this host
+    # when the MSVC directories were not visible).
+    "-cmake-generator", $buildGenerator.Name,
     "--",
     "-UFEATURE_opengl*",
     "-UQT_FEATURE_opengl*",
@@ -699,6 +1156,12 @@ $configureArguments = @(
     "-DZLIB_ROOT=$dependencyPrefix",
     "-DPNG_ROOT=$dependencyPrefix",
     "-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON",
+    # Belt and braces for the bundled pcre2 / disabled zstd choice above: even if a stray
+    # PCRE2Config.cmake or zstdConfig.cmake is reachable, configure must not consume it.
+    "-DCMAKE_DISABLE_FIND_PACKAGE_PCRE2=ON",
+    "-DCMAKE_DISABLE_FIND_PACKAGE_WrapSystemPCRE2=ON",
+    "-DCMAKE_DISABLE_FIND_PACKAGE_zstd=ON",
+    $generatorProgramArguments,
     "-DFEATURE_timezone=ON",
     "-DFEATURE_timezone_locale=OFF",
     "-DQT_FEATURE_concurrent=ON",
@@ -748,6 +1211,12 @@ Assert-CacheEntry -Cache $cache -Pattern "(?m)^FEATURE_system_png:BOOL=$systemCo
 Assert-CacheEntry -Cache $cache -Pattern "(?m)^QT_FEATURE_system_png:INTERNAL=$systemCodecState\r?`$" -Description "the internal $Configuration libpng linkage"
 Assert-CacheEntry -Cache $cache -Pattern "(?m)^FEATURE_system_zlib:BOOL=$systemCodecState\r?`$" -Description "$Configuration zlib linkage"
 Assert-CacheEntry -Cache $cache -Pattern "(?m)^QT_FEATURE_system_zlib:INTERNAL=$systemCodecState\r?`$" -Description "the internal $Configuration zlib linkage"
+Assert-CacheEntry -Cache $cache -Pattern '(?m)^FEATURE_pcre2:BOOL=ON\r?$' -Description "PCRE2 support"
+Assert-CacheEntry -Cache $cache -Pattern '(?m)^QT_FEATURE_pcre2:INTERNAL=ON\r?$' -Description "the internal PCRE2 feature"
+Assert-CacheEntry -Cache $cache -Pattern '(?m)^QT_FEATURE_system_pcre2:INTERNAL=OFF\r?$' `
+    -Description "PCRE2 linkage (Qt's bundled copy instead of a system PCRE2)"
+Assert-CacheEntry -Cache $cache -Pattern '(?m)^QT_FEATURE_zstd:(?:INTERNAL|UNINITIALIZED|BOOL)=OFF\r?$' `
+    -Description "zstd support (Qt 6.12 ships no bundled copy)"
 Assert-CacheEntry -Cache $cache -Pattern '(?m)^FEATURE_timezone:BOOL=ON\r?$' -Description "time-zone handling"
 Assert-CacheEntry -Cache $cache -Pattern '(?m)^QT_FEATURE_timezone:INTERNAL=ON\r?$' -Description "the internal time-zone feature"
 Assert-CacheEntry -Cache $cache -Pattern '(?m)^QT_FEATURE_concurrent:INTERNAL=ON\r?$' -Description "the required Qt Concurrent feature"
@@ -792,6 +1261,18 @@ foreach ($skippedSubmodule in @(
 $normalizedDependencyPrefix = $dependencyPrefix -replace '\\', '/'
 if (($cache -replace '\\', '/') -notmatch [regex]::Escape($normalizedDependencyPrefix)) {
     throw "Qt did not resolve its dependencies from $dependencyPrefix."
+}
+$makefileGeneratorEntry = [regex]::Match($cache, '(?m)^CMAKE_MAKE_PROGRAM:(?:FILEPATH|UNINITIALIZED)=(.*)$')
+$makefileGeneratorValue = if ($makefileGeneratorEntry.Success) {
+    $makefileGeneratorEntry.Groups[1].Value.Trim()
+} else { "" }
+Assert-CacheEntry -Cache $cache `
+    -Pattern "(?m)^CMAKE_GENERATOR:INTERNAL=$([regex]::Escape($buildGenerator.Name))\r?`$" `
+    -Description "the $($buildGenerator.Name) CMake generator"
+if ($buildGenerator.Program -and
+    -not [System.IO.Path]::IsPathRooted($makefileGeneratorValue)) {
+    throw ("Qt configure did not pin the build tool to $($buildGenerator.Program); the compiler " +
+        "tests then look the tool up on PATH, which this host reports incorrectly.")
 }
 
 $buildArguments = @(

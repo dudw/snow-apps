@@ -194,6 +194,9 @@ class ScreenshotOcrController final : public QObject {
     QString m_typesetting;
     Mode m_mode = Mode::Text;
     bool m_active = false;
+    // The standalone result window owns the presentation until it closes; the in-capture
+    // surfaces stay off screen while it does.
+    bool m_resultSurfaceActive = false;
     bool m_copyAndEndCapture = false;
     quint64 m_activationId = 0;
 };
