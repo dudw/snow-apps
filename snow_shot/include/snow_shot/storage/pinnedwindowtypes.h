@@ -55,6 +55,8 @@ enum class PinnedWindowCreationSource {
 };
 enum class PinnedWindowCloseIntent { Preserve, Hide, Close, Destroy };
 
+enum class PinnedTextType { RecognitionResults, TranslationResults };
+
 // These limits govern ignored records only.
 using PinnedWindowPolicy = CaptureHistoryPolicy;
 
@@ -84,6 +86,7 @@ struct PinnedWindowRecord final {
     QRectF contentCanvasRect;
     QRectF surfaceCanvasRect;
     QSize initialWindowSize;
+    QSizeF exactInitialWindowSize;
     PinnedWindowPlacement placement;
     PinnedWindowPlacement preThumbnailPlacement;
     PinnedWindowPlacement hideToTopPlacement;
@@ -101,6 +104,8 @@ struct PinnedWindowRecord final {
     double scalePercent = 100.0;
     int opacityPercent = 100;
     int clickThroughOpacityPercent = 50;
+    std::optional<QRectF> cropRect;
+    QRect animationCropRect;
     QTransform imageTransform;
     int quarterTurns = 0;
     bool hideToTopMode = false;
@@ -118,6 +123,7 @@ struct PinnedWindowRecord final {
     QByteArray resultStyle;
     QByteArray canvasSession;
     QByteArray recognitionResults;
+    PinnedTextType textType = PinnedTextType::RecognitionResults;
     bool recognitionVisible = false;
     bool translationVisible = false;
     QDateTime updatedUtc;

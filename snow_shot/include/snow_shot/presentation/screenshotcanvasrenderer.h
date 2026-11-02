@@ -139,6 +139,9 @@ class ScreenshotCanvasRenderer final : public SnowCanvasCustomRenderer {
                         const ScreenshotImageSource& samplingSource = {});
     // Pinned animation bypasses canvas reconstruction and annotation caches.
     void setPinnedAnimationFrame(const QImage& image, const QRectF& canvasRect);
+    // Live pixels retain their capture orientation. The canvas rectangle is the
+    // displayed extent after imageTransform; painting applies it without a new raster.
+    void setPinnedLiveFrame(ScreenshotImageSource source, const QTransform& imageTransform = {});
     [[nodiscard]] ScreenshotImageSource imageSourceSnapshot() const {
         return m_imageSource;
     }
@@ -150,6 +153,7 @@ class ScreenshotCanvasRenderer final : public SnowCanvasCustomRenderer {
     // View-space bounds of a pinned window's content, excluding its permanent shadow margin.
     // Fractional coordinates are intentional: 16 Windows device pixels need not be integral dp.
     void setPinnedViewportRect(const QRectF& rect);
+    void setPinnedContentClip(std::optional<QRectF> rect);
     void setPinnedResultSurface(const QRectF& contentCanvasRect, const QRectF& surfaceCanvasRect,
                                 const ScreenshotResultStyle& style);
     qsizetype selectionOutlineCacheBytes() const {
@@ -314,6 +318,8 @@ class ScreenshotCanvasRenderer final : public SnowCanvasCustomRenderer {
     std::uint64_t m_originalBackgroundRevision = 0;
     ScreenshotImageSource m_imageSource;
     ScreenshotImageSource m_samplingImageSource;
+    bool m_pinnedLiveFrames = false;
+    QTransform m_pinnedLiveTransform;
     QList<SnowCanvasBaseImageSource> m_baseImageSources;
     // Source opacity is checked once per image, independently of moving selection damage.
     QList<QRectF> m_opaqueImageCanvasRects;
@@ -326,6 +332,7 @@ class ScreenshotCanvasRenderer final : public SnowCanvasCustomRenderer {
     std::optional<Qt::Orientation> m_scrollingCropGuide;
     QSize m_imageViewportPhysicalSize;
     std::optional<QRectF> m_pinnedViewportRect;
+    std::optional<QRectF> m_pinnedContentClip;
     QRectF m_pinnedContentCanvasRect;
     QRectF m_pinnedSurfaceCanvasRect;
     ScreenshotResultStyle m_pinnedResultStyle;

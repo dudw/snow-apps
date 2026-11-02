@@ -146,6 +146,12 @@ impl Default for CaptureSampleMetadata {
 }
 
 pub(crate) trait MonitorCapturer: Send {
+    /// Persistent native windows may retain verified geometry while desktop
+    /// discovery omits them (for example during minimization). The default
+    /// keeps ordinary snapshot and recording inspection policies unchanged.
+    fn retained_target_info(&self) -> Option<crate::CaptureTargetInfo> {
+        None
+    }
     fn set_cancellation(&mut self, _token: snow_core::cancellation::CancellationToken) {}
     /// Match a native producer's rate to the stream's effective acquisition rate.
     /// Zero leaves the producer uncapped within its supported native limits.
@@ -325,6 +331,12 @@ pub(crate) trait CaptureBackend: Send + Sync {
     }
     fn display_generation(&self) -> Option<u64> {
         None
+    }
+    /// Validate display-cache freshness before reusing geometry or a region plan.
+    /// Backends with optional notification listeners can refresh on demand here;
+    /// an unavailable display must propagate an error instead of validating stale data.
+    fn checked_display_generation(&self) -> CaptureResult<Option<u64>> {
+        Ok(self.display_generation())
     }
     fn refresh_display_configuration(&self) -> CaptureResult<()> {
         Ok(())

@@ -43,6 +43,7 @@ struct ScreenshotAutomaticSaveRequest final {
 };
 
 namespace snow_shot::presentation {
+class LiveWindowSource;
 class PinnedWindowGroupManager;
 class PinnedWindowSelectionController;
 } // namespace snow_shot::presentation
@@ -70,11 +71,15 @@ class ScreenshotSelectionExportUiServices final : public ScreenshotSelectionExpo
     void cancelClipboardPublication();
     // Prepares one hidden native shell for the next Pin to Screen presentation.
     void prewarmPinnedWindow(QScreen* screen = nullptr);
-    // Fits decoded file or drop content on the target screen, retaining its text document.
     [[nodiscard]] bool
-    presentDecodedContentOnScreen(ScreenshotClipboardContent content, QScreen* screen,
-                                  bool autoResizeWindow,
-                                  snow_shot::storage::PinnedWindowCreationSource source);
+    presentLiveWindow(std::shared_ptr<snow_shot::presentation::LiveWindowSource> source,
+                      QScreen* screen, const QRect& nativeGeometry, const QSize& initialWindowSize,
+                      PinnedCompletion completion = {});
+    // Fits decoded file or drop content on the target screen, retaining its text document.
+    [[nodiscard]] bool presentDecodedContentOnScreen(
+        ScreenshotClipboardContent content, QScreen* screen, bool autoResizeWindow,
+        snow_shot::storage::PinnedWindowCreationSource source, bool initialAnnotationMode = false,
+        PinnedCompletion completion = {});
     // A null image is accepted when imageLoader is provided and
     // initialWindowSize supplies the known canvas dimensions.
     [[nodiscard]] bool presentPinnedImage(
@@ -91,7 +96,8 @@ class ScreenshotSelectionExportUiServices final : public ScreenshotSelectionExpo
         snow_shot::storage::PinnedSourceIdentity sourceIdentity = {},
         std::optional<bool> initialBorderVisible = {},
         std::optional<bool> initialShadowVisible = {},
-        std::shared_ptr<const ScreenshotAnimationSource> animationSource = {});
+        std::shared_ptr<const ScreenshotAnimationSource> animationSource = {},
+        bool initialAnnotationMode = false, QImage preparedDisplayImage = {});
     // An already composited selection bitmap placed by screenshotSelectionPinRequest.
     [[nodiscard]] bool
     presentCompositedSelectionImage(const QImage& image,
@@ -137,6 +143,9 @@ class ScreenshotSelectionExportUiServices final : public ScreenshotSelectionExpo
     void setRestoreFailureHandler(std::function<void()> handler) {
         m_restoreFailure = std::move(handler);
     }
+    void setLiveImageEditingHandler(std::function<void(const ScreenshotExportSource&)> handler) {
+        m_liveImageEditingRequested = std::move(handler);
+    }
     void destroyRecords(const QVector<QString>& ids);
     [[nodiscard]] snow_shot::storage::StorageResult tryDestroyRecords(const QVector<QString>& ids);
 
@@ -144,6 +153,8 @@ class ScreenshotSelectionExportUiServices final : public ScreenshotSelectionExpo
     void configureVisibility(ScreenshotPinnedWindow::Config* config);
     bool persistHiddenWindow(const snow_shot::storage::PinnedWindowRecord& record);
     bool hideRecords(const QVector<QString>& ids);
+    [[nodiscard]] ScreenshotPinnedWindow::HideOtherWindowsResult
+    hideOtherWindowsWithResult(const QString& exceptId);
     void cancelRestore(const QString& id);
     [[nodiscard]] ScreenshotPinnedWindow* liveWindow(const QString& id) const;
     [[nodiscard]] QString
@@ -167,7 +178,8 @@ class ScreenshotSelectionExportUiServices final : public ScreenshotSelectionExpo
         snow_shot::storage::PinnedSourceIdentity sourceIdentity = {},
         std::optional<bool> initialBorderVisible = {},
         std::optional<bool> initialShadowVisible = {},
-        std::shared_ptr<const ScreenshotAnimationSource> animationSource = {});
+        std::shared_ptr<const ScreenshotAnimationSource> animationSource = {},
+        bool initialAnnotationMode = false, QImage preparedDisplayImage = {});
 
     QHash<QString, QList<QPointer<ScreenshotPinnedWindow>>> m_sourceWindows;
     std::function<void()> m_restoreFailure;
@@ -190,6 +202,7 @@ class ScreenshotSelectionExportUiServices final : public ScreenshotSelectionExpo
     std::function<void()> m_showMainWindowRequested;
     std::function<void(const ScreenshotPinnedImageSnapshot&)> m_imageSplittingRequested;
     std::function<void(const QString&)> m_imageEditingRequested;
+    std::function<void(const ScreenshotExportSource&)> m_liveImageEditingRequested;
     std::function<ScreenshotPinnedRecognitionProviders()> m_recognitionProvider;
     snow_shot::presentation::PinnedWindowGroupManager* m_groupManager = nullptr;
     std::unique_ptr<snow_shot::presentation::PinnedWindowSelectionController> m_selectionController;

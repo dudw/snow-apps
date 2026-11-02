@@ -67,8 +67,8 @@ const QStringList& drawingShortcutToolIds() {
         QStringLiteral("eraser"),        QStringLiteral("watermark"),
         QStringLiteral("line"),          QStringLiteral("spotlight"),
         QStringLiteral("distance"),      QStringLiteral("angle"),
-        QStringLiteral("magnifier"),     QStringLiteral("reset_canvas"),
-        QStringLiteral("speech_bubble"),
+        QStringLiteral("bracket"),       QStringLiteral("magnifier"),
+        QStringLiteral("reset_canvas"),  QStringLiteral("speech_bubble"),
     };
     return ids;
 }
@@ -108,6 +108,7 @@ const QStringList& screenshotShortcutActionIds() {
             QStringLiteral("save_as_file"),
             QStringLiteral("upload_to_cloud"),
             QStringLiteral("pin_to_screen"),
+            QStringLiteral("pin_window_to_screen"),
             QStringLiteral("cancel_screenshot"),
             QStringLiteral("copy_to_clipboard"),
             QStringLiteral("undo"),
@@ -160,6 +161,8 @@ const QStringList& pinToScreenShortcutActionIds() {
         QStringLiteral("flip_horizontal"),
         QStringLiteral("flip_vertical"),
         QStringLiteral("reset_transform"),
+        QStringLiteral("batch_select_all"),
+        QStringLiteral("batch_save_as_file"),
     };
     return ids;
 }
@@ -907,6 +910,26 @@ bool ShortcutSettings::setTranslateSelectedText(
 }
 #endif
 
+shortcuts::ShortcutBindingList ShortcutSettings::toggleWindowUnderCursorAlwaysOnTop() const {
+#ifdef Q_OS_WIN
+    return shortcutValue(
+        QStringLiteral("global_shortcuts/toggle_window_under_cursor_always_on_top"));
+#else
+    return {};
+#endif
+}
+
+bool ShortcutSettings::setToggleWindowUnderCursorAlwaysOnTop(
+    const shortcuts::ShortcutBindingList& bindings) const {
+#ifdef Q_OS_WIN
+    return setShortcutValue(
+        QStringLiteral("global_shortcuts/toggle_window_under_cursor_always_on_top"), bindings);
+#else
+    Q_UNUSED(bindings);
+    return false;
+#endif
+}
+
 shortcuts::ShortcutBindingList ShortcutSettings::pinClipboardContent() const {
     return shortcutValue(QStringLiteral("global_shortcuts/pin_clipboard_content"));
 }
@@ -1092,6 +1115,14 @@ bool ScreenshotSettings::copyImageFileToClipboard() const {
 
 bool ScreenshotSettings::setCopyImageFileToClipboard(bool enabled) const {
     return cache().setValue(QStringLiteral("screenshot/copy_image_file_to_clipboard"), enabled);
+}
+
+bool ScreenshotSettings::copyAfterPinningToScreen() const {
+    return cache().value(QStringLiteral("screenshot/copy_after_pinning_to_screen")).toBool();
+}
+
+bool ScreenshotSettings::setCopyAfterPinningToScreen(bool enabled) const {
+    return cache().setValue(QStringLiteral("screenshot/copy_after_pinning_to_screen"), enabled);
 }
 
 QString ScreenshotSettings::imageSaveDirectory() const {
@@ -2536,6 +2567,14 @@ bool PinToScreenSettings::setShowWindowButtons(bool enabled) const {
     return cache().setValue(QStringLiteral("pin_to_screen/show_window_buttons"), enabled);
 }
 
+bool PinToScreenSettings::shakeWindowToHideOthers() const {
+    return cache().value(QStringLiteral("pin_to_screen/shake_window_to_hide_others")).toBool();
+}
+
+bool PinToScreenSettings::setShakeWindowToHideOthers(bool enabled) const {
+    return cache().setValue(QStringLiteral("pin_to_screen/shake_window_to_hide_others"), enabled);
+}
+
 bool PinToScreenSettings::exitAnnotationModeBeforeClosing() const {
     return cache()
         .value(QStringLiteral("pin_to_screen/exit_annotation_mode_before_closing"))
@@ -2757,6 +2796,17 @@ QStringList TraySettings::menuOptions() const {
 
 bool TraySettings::setMenuOptions(const QStringList& options) const {
     return cache().setValue(QStringLiteral("tray/menu_options"), stringArray(options));
+}
+
+bool SystemSettings::annotationModeWhenOpeningForEditing() const {
+    return cache()
+        .value(QStringLiteral("system/annotation_mode_when_opening_for_editing"))
+        .toBool();
+}
+
+bool SystemSettings::setAnnotationModeWhenOpeningForEditing(bool enabled) const {
+    return cache().setValue(QStringLiteral("system/annotation_mode_when_opening_for_editing"),
+                            enabled);
 }
 
 bool SystemSettings::launchAsAdministrator() const {

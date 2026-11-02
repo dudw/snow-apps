@@ -1017,6 +1017,7 @@ void navigationMatchesDisplaysAndRestoresLiveEndpoint(const QString& root) {
     ScreenshotInteractionState interaction;
     interaction.enterOverlayVisible(true);
     ScreenshotIntelligentSelectionModel intelligent;
+    intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
     require(intelligent.applyCanvasHitPath({QRectF(10, 10, 170, 60)}, QRectF(0, 0, 200, 80), 1.0),
             "failed to initialize intelligent selection");
 
@@ -2645,6 +2646,7 @@ void completionGesturesUseSharedEligibilityAcrossTools() {
         {QStringLiteral("pin"), QStringLiteral("pin_to_screen")},
         {QStringLiteral("ocr"), QStringLiteral("text_recognition")},
         {QStringLiteral("ocr_copy"), QStringLiteral("text_recognition_copy")},
+        {QStringLiteral("cancel"), QStringLiteral("cancel_screenshot")},
         {QStringLiteral("none"), QString()},
     };
     for (const auto& [setting, command] : commands) {
@@ -3017,7 +3019,7 @@ void selectAllShortcutSelectsCurrentScreenThenDesktop() {
                 ScreenshotRegionGeometry::fromPath(triangle, ScreenshotRegionType::Polyline));
         }
         ScreenshotIntelligentSelectionModel intelligent;
-        intelligent.beginCaptureSession(true);
+        intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
         ScreenshotInteractionState interaction;
         interaction.enterOverlayVisible(stage == 0);
         if (stage >= 2)
@@ -3223,7 +3225,8 @@ void previousSelectionShortcutUsesSharedConfirmation() {
                             "seed remembered aspect ratio before restoring selection");
                     selection.setSelectionRect(QRectF(10, 10, 50, 50));
                     ScreenshotIntelligentSelectionModel intelligent;
-                    intelligent.beginCaptureSession(true);
+                    intelligent.beginCaptureSession(
+                        snow_shot::SmartSelectionMode::WindowSubElement);
                     ScreenshotInteractionState interaction;
                     interaction.enterOverlayVisible(stage == 0);
                     if (stage == 2) {
@@ -3442,7 +3445,7 @@ void smartSelectionWheelAccumulatesMovement() {
     ScreenshotIntelligentSelectionModel intelligent;
     ScreenshotInteractionState interaction;
     interaction.enterOverlayVisible(true);
-    intelligent.beginCaptureSession(true);
+    intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
     QVector<QRectF> layers;
     for (int i = 0; i < 16; ++i)
         layers.append(QRectF(50 - i, 50 - i, 20 + i * 2, 20 + i * 2));
@@ -3575,7 +3578,7 @@ void configuredSelectionShortcutsRouteTabHistoryAndColorActions(bool targetSwitc
     ScreenshotIntelligentSelectionModel intelligent;
     ScreenshotInteractionState interaction;
     interaction.enterOverlayVisible(true);
-    intelligent.beginCaptureSession(true);
+    intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
     require(intelligent.selectionTarget() ==
                     ScreenshotIntelligentSelectionTarget::WindowSubElement &&
                 intelligent.toggleSelectionTarget(),
@@ -3722,17 +3725,17 @@ void configuredSelectionShortcutsRouteTabHistoryAndColorActions(bool targetSwitc
     require(selectorHitTestRequests == 5,
             "switching back to window mode did not request a fresh hit test");
 
-    intelligent.beginCaptureSession(false);
-    require(intelligent.applyCanvasHitPath({nestedChildSelection, childSelection, windowSelection},
-                                           QRectF(0, 0, 100, 100), 1.0),
-            "failed to seed disabled intelligent-selection candidates");
+    intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::Disabled);
+    require(!intelligent.applyCanvasHitPath({nestedChildSelection, childSelection, windowSelection},
+                                            QRectF(0, 0, 100, 100), 1.0),
+            "disabled intelligent selection must reject candidates");
     selection.setSelectionRect(intelligent.currentSelection());
     require(!dispatchShortcut(shortcutWindow, Qt::Key_Tab) &&
                 !intelligent.smartSelectionEnabled() &&
                 intelligent.selectionTarget() == ScreenshotIntelligentSelectionTarget::Window &&
-                intelligent.currentSelection() == windowSelection &&
-                selection.normalizedSelection() == windowSelection && selectorHitTestRequests == 5,
-            "disabled Smart selection must reject Tab and remain in window mode");
+                !intelligent.hasCurrentSelection() && selection.normalizedSelection().isEmpty() &&
+                selectorHitTestRequests == 5,
+            "disabled Smart selection must reject Tab and remain manual");
     require(persistedTargetChanges == 4,
             "disabled Smart selection must not persist a rejected Tab shortcut");
     if (targetSwitchOnly) {
@@ -3741,7 +3744,7 @@ void configuredSelectionShortcutsRouteTabHistoryAndColorActions(bool targetSwitc
         return;
     }
 
-    intelligent.beginCaptureSession(true);
+    intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
     intelligent.beginPress(QPointF(18, 18), windowSelection);
     previousSelectionAvailable = false;
     require(!dispatchShortcut(shortcutWindow, Qt::Key_R) && previousSelectionCalls == 1 &&
@@ -4475,11 +4478,7 @@ void shortcutExitConfirmationGatesCancellation() {
     auto* modal = owner.findChild<adqt::widgets::AdModal*>(
         QStringLiteral("screenshotShortcutExitConfirmation"));
     require(modal != nullptr && modal->ownerWindow() == &owner &&
-#ifdef Q_OS_MACOS
                 modal->mode() == adqt::widgets::AdModal::Mode::Window &&
-#else
-                modal->mode() == adqt::widgets::AdModal::Mode::Overlay &&
-#endif
                 modal->windowTitle() == QStringLiteral("Exit screenshot?") &&
                 modal->text() == QStringLiteral("Your current screenshot will be discarded.") &&
                 modal->acceptButton() != nullptr &&
@@ -4488,11 +4487,9 @@ void shortcutExitConfirmationGatesCancellation() {
                 modal->rejectButton() != nullptr &&
                 modal->rejectButton()->text() == QStringLiteral("Cancel") && exits == 0,
             "enabled confirmation must show the configured destructive modal on its owner");
-#ifdef Q_OS_MACOS
     require(modal->acceptButton()->window()->isWindow() &&
                 modal->acceptButton()->window() != &owner,
-            "macOS confirmation must use a native window that can cover floating toolbars");
-#endif
+            "confirmation must use a native window that can cover floating screenshot tools");
     require(confirmation.request(true, &owner) &&
                 owner.findChildren<adqt::widgets::AdModal*>(
                          QStringLiteral("screenshotShortcutExitConfirmation"))
@@ -4692,6 +4689,7 @@ void scrollingCaptureRoutesEveryToolbarShortcut() {
         QStringLiteral("scrolling_screenshot"),
         QStringLiteral("save_as_file"),
         QStringLiteral("pin_to_screen"),
+        QStringLiteral("pin_window_to_screen"),
         QStringLiteral("cancel_screenshot"),
         QStringLiteral("copy_to_clipboard"),
         QStringLiteral("undo"),
@@ -5023,6 +5021,65 @@ void cursorMovementShortcutsAreIndependentOfActiveTool() {
     }
 }
 
+void pinWindowShortcutUsesConfiguredBindings() {
+    const storage::ScreenshotShortcutSettings settings;
+    const QString id = QStringLiteral("pin_window_to_screen");
+    const auto original = settings.shortcuts(id);
+    const auto restore = qScopeGuard(
+        [&] { require(settings.setShortcuts(id, original), "restore window pin shortcut"); });
+    require(original == snow_shot::shortcuts::ShortcutBindingList{QStringLiteral("Alt+W")},
+            "window pin must default to Alt+W");
+    ScreenshotCaptureState capture;
+    capture.sessionState = ScreenshotSessionState::Editing;
+    ScreenshotDisplaySession displays;
+    ScreenshotGeometryMapper geometry;
+    ScreenshotSelectionModel selection;
+    selection.setSelectionRect(QRectF(10, 20, 80, 60));
+    ScreenshotIntelligentSelectionModel intelligent;
+    ScreenshotInteractionState interaction;
+    interaction.enterOverlayVisible(false);
+    interaction.confirmSelection();
+    bool inputAllowed = true;
+    int activations = 0;
+    ScreenshotOverlayInputActions actions;
+    actions.mainToolbarVisible = [] { return true; };
+    actions.localShortcutInputAllowed = [&] { return inputAllowed; };
+    actions.activateScreenshotShortcut = [&](const QString& action) {
+        require(action == id, "window pin shortcut must dispatch the window pin action");
+        ++activations;
+        return true;
+    };
+    ScreenshotOverlayInputHandler handler(
+        {capture, interaction, selection, intelligent, geometry, displays, actions});
+    QWidget receiver;
+    snow_shot::presentation::WindowShortcutManager manager;
+    manager.addScopeWindow(&receiver);
+    ScreenshotOverlayShortcutController shortcuts(manager, handler, interaction, intelligent,
+                                                  actions);
+    const auto trigger = [&](Qt::Key key) {
+        const bool handled = dispatchShortcut(receiver, key, Qt::AltModifier);
+        static_cast<void>(dispatchShortcutRelease(receiver, key, Qt::AltModifier));
+        return handled;
+    };
+    require(trigger(Qt::Key_W) && activations == 1,
+            "Alt+W must activate window pin exactly once for a confirmed selection");
+    inputAllowed = false;
+    require(!trigger(Qt::Key_W) && activations == 1,
+            "text input must suppress the window pin shortcut");
+    inputAllowed = true;
+    const auto suspension = manager.suspendInput();
+    require(!trigger(Qt::Key_W) && activations == 1,
+            "modal input suspension must suppress the window pin shortcut");
+    manager.resumeInput(suspension);
+    require(settings.setShortcuts(id, {QStringLiteral("Alt+J"), QStringLiteral("Alt+K")}),
+            "configure two window pin shortcuts");
+    require(!trigger(Qt::Key_W) && trigger(Qt::Key_J) && trigger(Qt::Key_K) && activations == 3,
+            "rebinding must immediately replace Alt+W with both configured shortcuts");
+    require(settings.setShortcuts(id, {}) && !trigger(Qt::Key_W) && !trigger(Qt::Key_J) &&
+                !trigger(Qt::Key_K) && activations == 3,
+            "clearing window pin shortcuts must disable every configured binding");
+}
+
 void selectionStagesActivateEveryToolbarShortcut() {
     const storage::ScreenshotShortcutSettings screenshotSettings;
     const storage::DrawingShortcutSettings drawingSettings;
@@ -5046,6 +5103,7 @@ void selectionStagesActivateEveryToolbarShortcut() {
         QStringLiteral("quick_save"),
         QStringLiteral("save_as_file"),
         QStringLiteral("pin_to_screen"),
+        QStringLiteral("pin_window_to_screen"),
         QStringLiteral("copy_to_clipboard"),
         QStringLiteral("undo"),
         QStringLiteral("redo"),
@@ -5794,7 +5852,7 @@ void rectangularRegionOperationsUseSmartSelection() {
     geometry.rebuild(displays);
     ScreenshotSelectionModel selection;
     ScreenshotIntelligentSelectionModel intelligent;
-    intelligent.beginCaptureSession(true);
+    intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
     ScreenshotInteractionState interaction;
     ScreenshotSelectorWorkflow workflow({capture,
                                          selector,
@@ -6766,7 +6824,7 @@ void rememberedRatioNormalizesSmartPicksBeforePresentation() {
                 "remembered ratio must arm before smart selection");
         selection.setSelectionRect(detected);
         ScreenshotIntelligentSelectionModel intelligent;
-        intelligent.beginCaptureSession(true);
+        intelligent.beginCaptureSession(snow_shot::SmartSelectionMode::WindowSubElement);
         require(intelligent.applyCanvasHitPath({detected}, canvas, 1.0),
                 "smart selection fixture must accept its detected frame");
         ScreenshotInteractionState interaction;
@@ -7136,7 +7194,9 @@ void configuredSnapArmsBeforeManualSelection() {
                 geometry.rebuild(displays);
                 ScreenshotSelectionModel selection;
                 ScreenshotIntelligentSelectionModel intelligent;
-                intelligent.beginCaptureSession(smartSelection);
+                intelligent.beginCaptureSession(
+                    smartSelection ? snow_shot::SmartSelectionMode::WindowSubElement
+                                   : snow_shot::SmartSelectionMode::Disabled);
                 const QRectF detected(50, 50, 320, 240);
                 if (smartSelection) {
                     selection.setSelectionRect(detected);
@@ -7803,6 +7863,7 @@ int main(int argc, char** argv) {
         cursorMovementShortcutsAreIndependentOfActiveTool();
         screenshotTextEditingTakesPriorityOverCancelShortcut();
         configuredScreenshotShortcutsControlMoveAndCursorNavigation();
+        pinWindowShortcutUsesConfiguredBindings();
         selectionStagesActivateEveryToolbarShortcut();
         toolbarSelectionPreparationRejectsIncompleteRegions();
         explicitToolbarCommandFinishesCanvasResize();
@@ -7872,6 +7933,7 @@ int main(int argc, char** argv) {
     configuredScreenshotShortcutsControlMoveAndCursorNavigation();
     shortcutExitConfirmationGatesCancellation();
     scrollingCaptureRoutesEveryToolbarShortcut();
+    pinWindowShortcutUsesConfiguredBindings();
     selectionStagesActivateEveryToolbarShortcut();
     toolbarSelectionPreparationRejectsIncompleteRegions();
     explicitToolbarCommandFinishesCanvasResize();

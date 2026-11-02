@@ -1099,6 +1099,10 @@ Files:
             <translation>Image Splitting</translation>
         </message>
         <message>
+            <source>Image Stitching is busy. Try again when it finishes.</source>
+            <translation>Image Stitching is busy. Try again when it finishes.</translation>
+        </message>
+        <message>
             <source>Image loading could not be started. Try again.</source>
             <translation>Image loading could not be started. Try again.</translation>
         </message>
@@ -1147,6 +1151,10 @@ Files:
             <translation>Select Image</translation>
         </message>
         <message>
+            <source>Stitch to PDF</source>
+            <translation>Stitch to PDF</translation>
+        </message>
+        <message>
             <source>The file manager is unavailable. Open it and try again.</source>
             <translation>The file manager is unavailable. Open it and try again.</translation>
         </message>
@@ -1169,6 +1177,53 @@ Files:
         <message>
             <source>The images could not be exported. Try again.</source>
             <translation>The images could not be exported. Try again.</translation>
+        </message>
+    </context>
+    <context>
+        <name>LiveWindowSource</name>
+        <message>
+            <source>Allow Accessibility in System Settings to monitor the live window's state.</source>
+            <translation>Allow Accessibility in System Settings to monitor the live window's state.</translation>
+        </message>
+        <message>
+            <source>Allow Screen &amp; System Audio Recording in System Settings to pin a live window.</source>
+            <translation>Allow Screen &amp; System Audio Recording in System Settings to pin a live window.</translation>
+        </message>
+        <message>
+            <source>The live window display could not be initialized.</source>
+            <translation>The live window display could not be initialized.</translation>
+        </message>
+        <message>
+            <source>The live window was closed.</source>
+            <translation>The live window was closed.</translation>
+        </message>
+        <message>
+            <source>The selected window is no longer available.</source>
+            <translation>The selected window is no longer available.</translation>
+        </message>
+        <message>
+            <source>The selected window's identity and state could not be verified.</source>
+            <translation>The selected window's identity and state could not be verified.</translation>
+        </message>
+        <message>
+            <source>The selection does not intersect the selected window.</source>
+            <translation>The selection does not intersect the selected window.</translation>
+        </message>
+        <message>
+            <source>The window content is temporarily unavailable. Retrying…</source>
+            <translation>The window content is temporarily unavailable. Retrying…</translation>
+        </message>
+        <message>
+            <source>The window is closed. The latest content cannot be displayed.</source>
+            <translation>The window is closed. The latest content cannot be displayed.</translation>
+        </message>
+        <message>
+            <source>The window is minimized. The latest content cannot be displayed.</source>
+            <translation>The window is minimized. The latest content cannot be displayed.</translation>
+        </message>
+        <message>
+            <source>The window state is temporarily unavailable. Retrying…</source>
+            <translation>The window state is temporarily unavailable. Retrying…</translation>
         </message>
     </context>
     <context>
@@ -1584,6 +1639,17 @@ Files:
             <source>%1%</source>
             <translation>%1%</translation>
         </message>
+        <message numerus="yes">
+            <source>%n window(s) displayed</source>
+            <translation>
+            <numerusform>%n window displayed</numerusform>
+            <numerusform>%n windows displayed</numerusform>
+        </translation>
+        </message>
+        <message>
+            <source>A pinned window is no longer available to save.</source>
+            <translation>A pinned window is no longer available to save.</translation>
+        </message>
         <message>
             <source>AirDrop</source>
             <translation>AirDrop</translation>
@@ -1595,6 +1661,14 @@ Files:
         <message>
             <source>Annotation mode</source>
             <translation>Annotation mode</translation>
+        </message>
+        <message>
+            <source>Apply Crop</source>
+            <translation>Apply Crop</translation>
+        </message>
+        <message>
+            <source>Batch Actions</source>
+            <translation>Batch Actions</translation>
         </message>
         <message>
             <source>Cancel</source>
@@ -1627,6 +1701,14 @@ Files:
         <message>
             <source>Close this pinned window?</source>
             <translation>Close this pinned window?</translation>
+        </message>
+        <message>
+            <source>Closed</source>
+            <translation>Closed</translation>
+        </message>
+        <message>
+            <source>Convert to Image</source>
+            <translation>Convert to Image</translation>
         </message>
         <message>
             <source>Copy original content</source>
@@ -1677,8 +1759,28 @@ Files:
             <translation>Destroy this pinned window? This action cannot be undone.</translation>
         </message>
         <message>
-            <source>Display text recognition results</source>
-            <translation>Display text recognition results</translation>
+            <source>Disable Hide to Top</source>
+            <translation>Disable Hide to Top</translation>
+        </message>
+        <message>
+            <source>Disable Lock Mode</source>
+            <translation>Disable Lock Mode</translation>
+        </message>
+        <message>
+            <source>Disable Thumbnail Mode</source>
+            <translation>Disable Thumbnail Mode</translation>
+        </message>
+        <message>
+            <source>Enable Hide to Top</source>
+            <translation>Enable Hide to Top</translation>
+        </message>
+        <message>
+            <source>Enable Lock Mode</source>
+            <translation>Enable Lock Mode</translation>
+        </message>
+        <message>
+            <source>Enable Thumbnail Mode</source>
+            <translation>Enable Thumbnail Mode</translation>
         </message>
         <message>
             <source>Enable annotation mode</source>
@@ -1703,10 +1805,6 @@ Files:
         <message>
             <source>Group: Default</source>
             <translation>Group: Default</translation>
-        </message>
-        <message>
-            <source>Hide All Windows to Top</source>
-            <translation>Hide All Windows to Top</translation>
         </message>
         <message>
             <source>Hide other windows</source>
@@ -1737,12 +1835,20 @@ Files:
             <translation>Increase speed</translation>
         </message>
         <message>
+            <source>Live content is unavailable. Retrying...</source>
+            <translation>Live content is unavailable. Retrying...</translation>
+        </message>
+        <message>
             <source>Load new content</source>
             <translation>Load new content</translation>
         </message>
         <message>
             <source>Lock mode</source>
             <translation>Lock mode</translation>
+        </message>
+        <message>
+            <source>Minimized</source>
+            <translation>Minimized</translation>
         </message>
         <message>
             <source>Move window</source>
@@ -1757,8 +1863,20 @@ Files:
             <translation>Next frame</translation>
         </message>
         <message>
+            <source>No available output filename was found</source>
+            <translation>No available output filename was found</translation>
+        </message>
+        <message>
             <source>Opacity</source>
             <translation>Opacity</translation>
+        </message>
+        <message>
+            <source>Other windows could not be hidden.</source>
+            <translation>Other windows could not be hidden.</translation>
+        </message>
+        <message>
+            <source>Other windows hidden.</source>
+            <translation>Other windows hidden.</translation>
         </message>
         <message>
             <source>Pause</source>
@@ -1785,6 +1903,10 @@ Files:
             <translation>Process image</translation>
         </message>
         <message>
+            <source>Recognition results</source>
+            <translation>Recognition results</translation>
+        </message>
+        <message>
             <source>Recognizing text</source>
             <translation>Recognizing text</translation>
         </message>
@@ -1805,12 +1927,35 @@ Files:
             <translation>Rotate counterclockwise</translation>
         </message>
         <message>
+            <source>Save as File</source>
+            <translation>Save as File</translation>
+        </message>
+        <message>
             <source>Save as file</source>
             <translation>Save as file</translation>
         </message>
         <message>
+            <source>Save displayed windows</source>
+            <translation>Save displayed windows</translation>
+        </message>
+        <message numerus="yes">
+            <source>Saved %n window(s).</source>
+            <translation>
+            <numerusform>Saved %n window.</numerusform>
+            <numerusform>Saved %n windows.</numerusform>
+        </translation>
+        </message>
+        <message>
+            <source>Saved: %1; failed: %2.</source>
+            <translation>Saved: %1; failed: %2.</translation>
+        </message>
+        <message>
             <source>Scale</source>
             <translation>Scale</translation>
+        </message>
+        <message>
+            <source>Select All</source>
+            <translation>Select All</translation>
         </message>
         <message>
             <source>Show all windows</source>
@@ -1829,20 +1974,40 @@ Files:
             <translation>Show shadow</translation>
         </message>
         <message>
+            <source>Show text</source>
+            <translation>Show text</translation>
+        </message>
+        <message>
             <source>Supported files (%1)</source>
             <translation>Supported files (%1)</translation>
+        </message>
+        <message>
+            <source>Text type: %1</source>
+            <translation>Text type: %1</translation>
         </message>
         <message>
             <source>The animation could not be played</source>
             <translation>The animation could not be played</translation>
         </message>
         <message>
+            <source>The current window content cannot be captured.</source>
+            <translation>The current window content cannot be captured.</translation>
+        </message>
+        <message>
             <source>The image could not be saved automatically: %1</source>
             <translation>The image could not be saved automatically: %1</translation>
         </message>
         <message>
+            <source>The live window requires a current frame snapshot.</source>
+            <translation>The live window requires a current frame snapshot.</translation>
+        </message>
+        <message>
             <source>The new content could not be loaded</source>
             <translation>The new content could not be loaded</translation>
+        </message>
+        <message>
+            <source>The output directory could not be created</source>
+            <translation>The output directory could not be created</translation>
         </message>
         <message>
             <source>The pinned image copy could not be started</source>
@@ -1861,8 +2026,32 @@ Files:
             <translation>The pinned image save could not be started</translation>
         </message>
         <message>
+            <source>The window changed while preparing the image. Please try again.</source>
+            <translation>The window changed while preparing the image. Please try again.</translation>
+        </message>
+        <message>
+            <source>The window is closed. The latest content cannot be displayed.</source>
+            <translation>The window is closed. The latest content cannot be displayed.</translation>
+        </message>
+        <message>
+            <source>The window is minimized. The latest content cannot be displayed.</source>
+            <translation>The window is minimized. The latest content cannot be displayed.</translation>
+        </message>
+        <message>
             <source>Thumbnail mode</source>
             <translation>Thumbnail mode</translation>
+        </message>
+        <message>
+            <source>Translation results</source>
+            <translation>Translation results</translation>
+        </message>
+        <message>
+            <source>Unavailable</source>
+            <translation>Unavailable</translation>
+        </message>
+        <message>
+            <source>Untitled window</source>
+            <translation>Untitled window</translation>
         </message>
         <message>
             <source>Uploaded to cloud. Link copied to clipboard.</source>
@@ -2108,11 +2297,22 @@ Files:
             <translation>Destroy</translation>
         </message>
         <message numerus="yes">
+            <source>Destroy %n displayed window(s)? This action cannot be undone.</source>
+            <translation>
+            <numerusform>Destroy %n displayed window? This action cannot be undone.</numerusform>
+            <numerusform>Destroy %n displayed windows? This action cannot be undone.</numerusform>
+        </translation>
+        </message>
+        <message numerus="yes">
             <source>Destroy %n selected window(s)? This action cannot be undone.</source>
             <translation>
             <numerusform>Destroy %n selected window? This action cannot be undone.</numerusform>
             <numerusform>Destroy %n selected windows? This action cannot be undone.</numerusform>
         </translation>
+        </message>
+        <message>
+            <source>Destroy displayed windows</source>
+            <translation>Destroy displayed windows</translation>
         </message>
         <message>
             <source>Destroy selected windows</source>
@@ -2141,6 +2341,10 @@ Files:
         <message>
             <source>New Group</source>
             <translation>New Group</translation>
+        </message>
+        <message>
+            <source>The displayed windows could not be destroyed.</source>
+            <translation>The displayed windows could not be destroyed.</translation>
         </message>
         <message>
             <source>The selected windows could not be destroyed.</source>

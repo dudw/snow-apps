@@ -503,6 +503,10 @@
             <translation>箭头</translation>
         </message>
         <message>
+            <source>Bracket annotation</source>
+            <translation>括号标注</translation>
+        </message>
+        <message>
             <source>Distance annotation</source>
             <translation>距离标注</translation>
         </message>
@@ -1042,6 +1046,10 @@
             <translation>没有隐藏的工具</translation>
         </message>
         <message>
+            <source>Pin Window to Screen</source>
+            <translation>固定窗口到屏幕</translation>
+        </message>
+        <message>
             <source>Pin to screen</source>
             <translation>固定到屏幕</translation>
         </message>
@@ -1221,7 +1229,7 @@
         </message>
         <message>
             <source>Add Edit with Snow Shot to the Windows context menu to pin a supported image or document file to the screen.</source>
-            <translation>将“使用 Snow Shot 编辑”添加到 Windows 右键菜单，以将支持的图像或文档文件贴到屏幕。</translation>
+            <translation>将“使用 Snow Shot 编辑”添加到 Windows 右键菜单，以将支持的图像或文档文件固定到屏幕。</translation>
         </message>
         <message>
             <source>Add a mask to highlight text recognition results</source>
@@ -1270,6 +1278,10 @@
         <message>
             <source>Allow resizing the selection from its borders while non-move tools are active</source>
             <translation>启用非移动工具时，允许从选区边缘调整选区大小</translation>
+        </message>
+        <message>
+            <source>Also copy the screenshot to the clipboard when pinning it to screen</source>
+            <translation>将截图固定到屏幕时，同时将截图复制到剪贴板</translation>
         </message>
         <message>
             <source>Always</source>
@@ -1448,6 +1460,10 @@
             <translation>存在焦点全屏窗口时自动禁用</translation>
         </message>
         <message>
+            <source>Automatically enable annotation mode in new Pin to Screen windows opened with Edit with Snow Shot.</source>
+            <translation>通过“使用 Snow Shot 编辑”打开新的贴图窗口时，自动启用标注模式。</translation>
+        </message>
+        <message>
             <source>Automatically exit screen recording after the recording is saved.</source>
             <translation>保存录制内容后自动退出屏幕录制。</translation>
         </message>
@@ -1496,6 +1512,14 @@
             <translation>条码识别</translation>
         </message>
         <message>
+            <source>Batch Actions: Save as File</source>
+            <translation>批量操作：保存为文件</translation>
+        </message>
+        <message>
+            <source>Batch Actions: Select All</source>
+            <translation>批量操作：全选</translation>
+        </message>
+        <message>
             <source>Blur</source>
             <translation>模糊</translation>
         </message>
@@ -1518,6 +1542,10 @@
         <message>
             <source>Bottom right</source>
             <translation>右下角</translation>
+        </message>
+        <message>
+            <source>Bracket annotation</source>
+            <translation>括号标注</translation>
         </message>
         <message>
             <source>Browse</source>
@@ -1628,6 +1656,10 @@
             <translation>为截图、固定到屏幕窗口、全屏画布和屏幕录制工具栏选择图像。清空路径可移除此皮肤。</translation>
         </message>
         <message>
+            <source>Choose automatic window or window sub-element selection, or select manually</source>
+            <translation>选择自动选取窗口或窗口子元素，或手动选择</translation>
+        </message>
+        <message>
             <source>Choose how much execution time the application receives</source>
             <translation>选择应用程序获得的执行时间</translation>
         </message>
@@ -1693,11 +1725,11 @@
         </message>
         <message>
             <source>Choose the default font for newly pinned text</source>
-            <translation>选择新贴图文本的默认字体</translation>
+            <translation>为新固定到屏幕的文本选择默认字体</translation>
         </message>
         <message>
             <source>Choose the default font size for newly pinned text</source>
-            <translation>选择新贴图文本的默认字号</translation>
+            <translation>为新固定到屏幕的文本选择默认字号</translation>
         </message>
         <message>
             <source>Choose the dialog used for manual image saves</source>
@@ -1940,6 +1972,10 @@
             <translation>将翻译结果复制为图片</translation>
         </message>
         <message>
+            <source>Copy after pinning to screen</source>
+            <translation>固定到屏幕后复制</translation>
+        </message>
+        <message>
             <source>Copy after text recognition</source>
             <translation>文字识别后复制</translation>
         </message>
@@ -2153,7 +2189,7 @@
         </message>
         <message>
             <source>Defaults for newly pinned text; source formatting is preserved</source>
-            <translation>设置新贴图文本的默认样式，并保留源格式</translation>
+            <translation>为新固定到屏幕的文本设置默认样式，并保留源格式</translation>
         </message>
         <message>
             <source>Delay %1s to execute</source>
@@ -2328,6 +2364,10 @@
             <translation>启用 MCP 集成</translation>
         </message>
         <message>
+            <source>Enable annotation mode when opening for editing</source>
+            <translation>打开编辑时启用标注模式</translation>
+        </message>
+        <message>
             <source>Enable edit mode</source>
             <translation>启用编辑模式</translation>
         </message>
@@ -2389,7 +2429,7 @@
         </message>
         <message>
             <source>Exit annotation mode and keep the pinned window open when closing.</source>
-            <translation>关闭时退出标注模式，并保持贴图窗口打开。</translation>
+            <translation>关闭时退出标注模式，并保持固定到屏幕窗口打开。</translation>
         </message>
         <message>
             <source>Exit annotation mode before closing</source>
@@ -2652,6 +2692,10 @@
             <translation>图像导出</translation>
         </message>
         <message>
+            <source>Image files</source>
+            <translation>图像文件</translation>
+        </message>
+        <message>
             <source>Image files (*.png *.ico);;PNG images (*.png);;Icon files (*.ico)</source>
             <translation>图像文件 (*.png *.ico);;PNG 图像 (*.png);;图标文件 (*.ico)</translation>
         </message>
@@ -2849,7 +2893,7 @@
         </message>
         <message>
             <source>Limit the width of pinned text, including padding</source>
-            <translation>限制贴图文本的宽度，包括内边距</translation>
+            <translation>限制固定到屏幕的文本宽度，包括内边距</translation>
         </message>
         <message>
             <source>Line</source>
@@ -3232,6 +3276,10 @@
             <translation>将选中文件固定到屏幕</translation>
         </message>
         <message>
+            <source>Pin Window to Screen</source>
+            <translation>固定窗口到屏幕</translation>
+        </message>
+        <message>
             <source>Pin clipboard</source>
             <translation>将剪贴板内容固定到屏幕</translation>
         </message>
@@ -3241,7 +3289,7 @@
         </message>
         <message>
             <source>Pin images, supported files, formatted text, or HTML from the clipboard to the screen</source>
-            <translation>将剪贴板中的图像、支持的文件、格式化文本或 HTML 贴到屏幕</translation>
+            <translation>将剪贴板中的图像、支持的文件、格式化文本或 HTML 固定到屏幕</translation>
         </message>
         <message>
             <source>Pin screenshot to screen</source>
@@ -3249,11 +3297,11 @@
         </message>
         <message>
             <source>Pin selected image or document files from File Explorer or the desktop to the screen</source>
-            <translation>将文件资源管理器或桌面中选中的图像或文档文件贴到屏幕</translation>
+            <translation>将文件资源管理器或桌面中选中的图像或文档文件固定到屏幕</translation>
         </message>
         <message>
             <source>Pin selected image or document files from Finder or the desktop to the screen</source>
-            <translation>将访达或桌面中选中的图像或文档文件贴到屏幕</translation>
+            <translation>将访达或桌面中选中的图像或文档文件固定到屏幕</translation>
         </message>
         <message>
             <source>Pin selection</source>
@@ -3418,6 +3466,10 @@
         <message>
             <source>Quick selection</source>
             <translation>快速选择</translation>
+        </message>
+        <message>
+            <source>Rapidly drag a pinned window back and forth to hide other pinned windows in the current group.</source>
+            <translation>快速来回拖动固定到屏幕的窗口，以隐藏当前分组中的其他固定到屏幕的窗口。</translation>
         </message>
         <message>
             <source>Real-time</source>
@@ -3828,10 +3880,6 @@
             <translation>次要目标语言</translation>
         </message>
         <message>
-            <source>Select child elements within a window while taking a screenshot</source>
-            <translation>截图时选择窗口中的子元素</translation>
-        </message>
-        <message>
             <source>Select dark theme tray icon</source>
             <translation>选择深色主题托盘图标</translation>
         </message>
@@ -4014,6 +4062,10 @@
         <message>
             <source>Shake Window</source>
             <translation>晃动窗口</translation>
+        </message>
+        <message>
+            <source>Shake a window to hide other windows</source>
+            <translation>摇动窗口以隐藏其他窗口</translation>
         </message>
         <message>
             <source>Shape tool</source>
@@ -4456,6 +4508,10 @@
             <translation>缩略图模式</translation>
         </message>
         <message>
+            <source>Toggle Always on Top for the Window Under the Cursor</source>
+            <translation>切换鼠标所在窗口的置顶状态</translation>
+        </message>
+        <message>
             <source>Toggle Global/Relative Coordinates</source>
             <translation>切换全局/相对坐标</translation>
         </message>
@@ -4470,6 +4526,10 @@
         <message>
             <source>Toggle hotkeys</source>
             <translation>切换快捷键</translation>
+        </message>
+        <message>
+            <source>Toggle whether the window under the cursor stays above other windows</source>
+            <translation>切换鼠标指针下的窗口是否始终显示在其他窗口之上</translation>
         </message>
         <message>
             <source>Tool positions</source>
@@ -4728,6 +4788,10 @@
             <translation>编辑文字时，按 Delete 键删除选中的文字或光标后的字符。</translation>
         </message>
         <message>
+            <source>Window</source>
+            <translation>窗口</translation>
+        </message>
+        <message>
             <source>Window Element API</source>
             <translation>窗口元素 API</translation>
         </message>
@@ -4742,6 +4806,10 @@
         <message>
             <source>Window interface</source>
             <translation>窗口界面</translation>
+        </message>
+        <message>
+            <source>Window sub-element</source>
+            <translation>窗口子元素</translation>
         </message>
         <message>
             <source>Windows context menu</source>

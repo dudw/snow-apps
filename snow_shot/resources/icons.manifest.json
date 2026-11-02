@@ -159,6 +159,14 @@
     },
     {
       "variant": "outlined",
+      "symbol": "ApplyCrop",
+      "name": "apply-crop",
+      "source": "../src/presentation/components/icons/resources/apply-crop.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
       "symbol": "ArrowRatio",
       "name": "arrow-ratio",
       "source": "../src/presentation/components/icons/resources/arrow-ratio.svg",
@@ -455,6 +463,14 @@
     },
     {
       "variant": "outlined",
+      "symbol": "BracketAnnotation",
+      "name": "bracket-annotation",
+      "source": "../src/presentation/components/icons/resources/bracket-annotation.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
       "symbol": "BrushPressureSensitive",
       "name": "brush-pressure-sensitive",
       "source": "../src/presentation/components/icons/resources/brush-pressure-sensitive.svg",
@@ -535,6 +551,22 @@
     },
     {
       "variant": "outlined",
+      "symbol": "DistanceUnitFt",
+      "name": "distance-unit-ft",
+      "source": "../src/presentation/components/icons/resources/distance-unit-ft.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
+      "symbol": "DistanceUnitIn",
+      "name": "distance-unit-in",
+      "source": "../src/presentation/components/icons/resources/distance-unit-in.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
       "symbol": "DistanceUnitKm",
       "name": "distance-unit-km",
       "source": "../src/presentation/components/icons/resources/distance-unit-km.svg",
@@ -559,9 +591,25 @@
     },
     {
       "variant": "outlined",
+      "symbol": "DistanceUnitPt",
+      "name": "distance-unit-pt",
+      "source": "../src/presentation/components/icons/resources/distance-unit-pt.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
       "symbol": "DistanceUnitPx",
       "name": "distance-unit-px",
       "source": "../src/presentation/components/icons/resources/distance-unit-px.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
+      "symbol": "DistanceUnitUm",
+      "name": "distance-unit-um",
+      "source": "../src/presentation/components/icons/resources/distance-unit-um.svg",
       "colorModel": "monochrome",
       "fit": "contain"
     },
@@ -938,6 +986,14 @@
       "symbol": "PinToScreenManagement",
       "name": "pin-to-screen-management",
       "source": "../src/presentation/components/icons/resources/pin-to-screen-management.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
+      "symbol": "PinWindowToScreen",
+      "name": "pin-window-to-screen",
+      "source": "../src/presentation/components/icons/resources/pin-window-to-screen.svg",
       "colorModel": "monochrome",
       "fit": "contain"
     },
@@ -1439,6 +1495,14 @@
     },
     {
       "variant": "outlined",
+      "symbol": "TextType",
+      "name": "text-type",
+      "source": "../src/presentation/components/icons/resources/text-type.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
       "symbol": "ToolArrow",
       "name": "tool-arrow",
       "source": "../src/presentation/components/icons/resources/tool-arrow.svg",
@@ -1603,6 +1667,38 @@
       "name": "window-group-switch",
       "source": "../src/presentation/components/icons/resources/window-group-switch.svg",
       "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "outlined",
+      "symbol": "WindowUnderCursorAlwaysOnTop",
+      "name": "window-under-cursor-always-on-top",
+      "source": "../src/presentation/components/icons/resources/window-under-cursor-always-on-top.svg",
+      "colorModel": "monochrome",
+      "fit": "contain"
+    },
+    {
+      "variant": "twotone",
+      "symbol": "LiveWindowClosed",
+      "name": "live-window-closed",
+      "source": "../src/presentation/components/icons/resources/live-window-closed.svg",
+      "colorModel": "twoTone",
+      "fit": "contain"
+    },
+    {
+      "variant": "twotone",
+      "symbol": "LiveWindowMinimized",
+      "name": "live-window-minimized",
+      "source": "../src/presentation/components/icons/resources/live-window-minimized.svg",
+      "colorModel": "twoTone",
+      "fit": "contain"
+    },
+    {
+      "variant": "twotone",
+      "symbol": "LiveWindowUnavailable",
+      "name": "live-window-unavailable",
+      "source": "../src/presentation/components/icons/resources/live-window-unavailable.svg",
+      "colorModel": "twoTone",
       "fit": "contain"
     },
     {

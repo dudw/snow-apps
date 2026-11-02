@@ -351,6 +351,7 @@ void recordingControlsRemainLaidOutAcrossStateChanges() {
     options.showArrowTool = false;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showRecordingControls = true;
     options.enableStyleToolbar = false;
     ScreenshotToolPalette palette(options);
@@ -3568,6 +3569,7 @@ void moveToolPresentationUsesTheOwningShortcutScope() {
     screenshotOptions.showArrowTool = false;
     screenshotOptions.showDistanceTool = false;
     screenshotOptions.showAngleTool = false;
+    screenshotOptions.showBracketTool = false;
     screenshotOptions.enableStyleToolbar = false;
     ScreenshotToolPalette screenshotPalette(screenshotOptions);
     const QList<adqt::widgets::AdButton*> screenshotButtons = mainToolbarButtons(screenshotPalette);
@@ -3589,6 +3591,7 @@ void moveToolPresentationUsesTheOwningShortcutScope() {
     pinnedOptions.showArrowTool = false;
     pinnedOptions.showDistanceTool = false;
     pinnedOptions.showAngleTool = false;
+    pinnedOptions.showBracketTool = false;
     pinnedOptions.enableStyleToolbar = false;
     ScreenshotToolPalette pinnedPalette(pinnedOptions);
     const QList<adqt::widgets::AdButton*> pinnedButtons = mainToolbarButtons(pinnedPalette);
@@ -3882,6 +3885,7 @@ void configurableToolbarLayoutSupportsArbitraryPopoverGroups() {
     options.showArrowTool = true;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showLineTool = true;
     options.showFreeDrawTool = true;
     options.showHighlightTool = true;
@@ -4037,6 +4041,7 @@ void arrowAndLineUseConfiguredPopoverGroup() {
     options.showArrowTool = true;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showLineTool = true;
     options.enableStyleToolbar = false;
     options.toolbarLayout = snow_shot::storage::ScreenshotToolbarLayout{
@@ -4357,6 +4362,7 @@ void mainToolbarGroupPopoversRecreateTheirOptions() {
     actionOptions.showArrowTool = false;
     actionOptions.showDistanceTool = false;
     actionOptions.showAngleTool = false;
+    actionOptions.showBracketTool = false;
     actionOptions.showTableTool = true;
     actionOptions.showQrTool = true;
     actionOptions.enableStyleToolbar = false;
@@ -4616,6 +4622,7 @@ void tableQrPopoverSharesOneEntryAndRemembersTheSelectedMode() {
     options.showArrowTool = false;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showTableTool = true;
     options.showQrTool = true;
     options.enableStyleToolbar = false;
@@ -5450,6 +5457,7 @@ void screenshotResultActionsFollowCustomLayout() {
         options.showDistanceTool = false;
     options.showSpeechBubbleTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showScreenRecordButton = true;
     options.enableStyleToolbar = false;
     options.actions = ScreenshotToolPalette::CancelAction | ScreenshotToolPalette::CopyAction;
@@ -6296,6 +6304,7 @@ void arrowAndLineRemainDirectWhenConfiguredIndividually() {
     arrowOptions.showArrowTool = true;
     arrowOptions.showDistanceTool = false;
     arrowOptions.showAngleTool = false;
+    arrowOptions.showBracketTool = false;
     arrowOptions.enableStyleToolbar = false;
     ScreenshotToolPalette arrowPalette(arrowOptions);
     const QList<adqt::widgets::AdButton*> arrowButtons = mainToolbarButtons(arrowPalette);
@@ -6311,6 +6320,7 @@ void arrowAndLineRemainDirectWhenConfiguredIndividually() {
     lineOptions.showArrowTool = false;
     lineOptions.showDistanceTool = false;
     lineOptions.showAngleTool = false;
+    lineOptions.showBracketTool = false;
     lineOptions.showLineTool = true;
     lineOptions.enableStyleToolbar = false;
     ScreenshotToolPalette linePalette(lineOptions);
@@ -8812,6 +8822,7 @@ void lineToolIsDiscoverableSelectableAndUsesLinearStyleControls() {
     options.showArrowTool = false;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showLineTool = true;
     ScreenshotToolPalette palette(options);
 
@@ -9032,6 +9043,7 @@ void freeDrawToolIsDistinctAndUsesIndependentPathStyleControls() {
     options.showArrowTool = false;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showLineTool = true;
     options.showFreeDrawTool = true;
     ScreenshotToolPalette palette(options);
@@ -9078,6 +9090,7 @@ void highlightVariantsUseConfiguredPopoverGroup() {
     options.showArrowTool = false;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showFreeDrawTool = true;
     options.showHighlightTool = true;
     options.showPenHighlightTool = true;
@@ -9667,6 +9680,7 @@ void filterToolExposesTypeAndIntensityControls() {
     options.showArrowTool = false;
     options.showDistanceTool = false;
     options.showAngleTool = false;
+    options.showBracketTool = false;
     options.showFilterTool = true;
     ScreenshotToolPalette palette(options);
 
@@ -12889,6 +12903,117 @@ void magnifierControlsRetranslateAndRenderPreviews() {
     }
 }
 
+void bracketSettingsAndIcons() {
+    using namespace snow_shot::presentation;
+    auto& theme = styles::ThemeManager::instance();
+    const auto originalTheme = theme.themeMode();
+    const auto restore = qScopeGuard([&] { theme.setThemeMode(originalTheme); });
+    ScreenshotToolPalette::Options bracketOptions;
+    bracketOptions.toolbarLayout = snow_shot::storage::ScreenshotToolbarLayout{};
+    bracketOptions.toolbarLayout->positions = {{QStringLiteral("angle")},
+                                               {QStringLiteral("bracket")}};
+    for (const auto& descriptor : toolbar_layout::drawingEditorDescriptors()) {
+        const QString id = QLatin1String(descriptor.id);
+        if (id != QStringLiteral("angle") && id != QStringLiteral("bracket"))
+            bracketOptions.toolbarLayout->hidden.append(id);
+    }
+    ScreenshotToolPalette palette(bracketOptions);
+    palette.show();
+    int activations = 0;
+    QObject::connect(&palette, &ScreenshotToolPalette::bracketToolRequested,
+                     [&] { ++activations; });
+    require(palette.activateDrawingShortcut(QStringLiteral("bracket")) && activations == 1 &&
+                palette.activeTool() == ScreenshotToolPalette::Tool::Bracket,
+            "assignable bracket shortcut activates the toolbar tool");
+    QCoreApplication::processEvents();
+    require(palette.findChild<QWidget*>(QStringLiteral("screenshotBracketStyleControls")) &&
+                !palette.findChild<QWidget*>(QStringLiteral("screenshotBracketUnitButtonGroup")),
+            "bracket exposes only stroke color and width controls");
+    require(palette.creationStyleDefaults().bracket.stroke == QColor("#f5222d") &&
+                palette.creationStyleDefaults().bracket.strokeWidth == 2,
+            "bracket starts with independent red two-unit strokes");
+    SnowCanvasBracketStyle emitted;
+    quint32 mask = 0;
+    palette.setStyleEditHandler([&](const SnowCanvasStyleEdit& edit) {
+        const auto* bracket = std::get_if<SnowCanvasBracketStyleEdit>(&edit);
+        require(bracket != nullptr, "bracket controls emit bracket property patches");
+        emitted = bracket->style;
+        mask = bracket->properties;
+        palette.rememberStyleEdit(edit);
+        return true;
+    });
+    clickStyleControl(palette, "Bracket stroke width 4");
+    require(emitted.strokeWidth == 4 && mask == 2, "width preset only changes width");
+    clickStyleControl(palette, "Bracket stroke color #1677ff");
+    require(emitted.stroke == QColor("#1677ff") && mask == 1, "color preset only changes color");
+    palette.setActiveTool(ScreenshotToolPalette::Tool::Angle);
+    palette.setActiveTool(ScreenshotToolPalette::Tool::Bracket);
+    require(palette.creationStyleDefaults().bracket == emitted,
+            "reused controls retain independent bracket defaults");
+    auto* bracket =
+        palette.findChild<adqt::widgets::AdButton*>(QStringLiteral("screenshotBracketButton"));
+    auto* angle =
+        palette.findChild<adqt::widgets::AdButton*>(QStringLiteral("screenshotAngleButton"));
+    require(bracket && angle && bracket->iconSize() == angle->iconSize() &&
+                bracket->iconRef().colors().isEmpty() &&
+                adqt::icons::describeIcon(bracket->iconRef()).colorModel ==
+                    adqt::icons::IconColorModel::Monochrome,
+            "bracket icon matches Angle metrics and inherits theme colors");
+    const auto svg = bracket->iconRef().descriptor()->svg;
+    require(svg.find("1024 1024") != std::string_view::npos &&
+                svg.find("stroke-width=\"72\"") != std::string_view::npos &&
+                svg.find("stroke-linecap=\"round\"") != std::string_view::npos,
+            "bracket follows the Ant icon grid, stroke, and rounded detail rules");
+    QImage sheet(400, 280, QImage::Format_ARGB32_Premultiplied);
+    sheet.fill(Qt::white);
+    QPainter painter(&sheet);
+    for (const bool dark : {false, true}) {
+        theme.setThemeMode(dark ? styles::ThemeMode::Dark : styles::ThemeMode::Light);
+        adqt::theme::ThemeManager::instance().applyTo(*qApp);
+        for (int state = 0; state < 4; ++state) {
+            palette.setActiveTool(state == 2 ? ScreenshotToolPalette::Tool::Bracket
+                                             : ScreenshotToolPalette::Tool::Select);
+            bracket->setEnabled(state != 3);
+            angle->setEnabled(state != 3);
+            if (state == 1) {
+                for (auto* button : {bracket, angle}) {
+                    button->setAttribute(Qt::WA_UnderMouse, true);
+                    const QPoint local = button->rect().center();
+                    QEnterEvent enter(local, button->mapTo(button->window(), local),
+                                      button->mapToGlobal(local));
+                    QApplication::sendEvent(button, &enter);
+                }
+            }
+            QCoreApplication::processEvents();
+            const int x = dark ? 200 : 0, y = state * 70;
+            painter.fillRect(x, y, 200, 70, dark ? QColor("#141414") : QColor("#ffffff"));
+            painter.setPen(dark ? Qt::white : Qt::black);
+            painter.drawText(x + 8, y + 15,
+                             QStringList{"Normal", "Hover", "Selected", "Disabled"}.at(state));
+            painter.drawPixmap(x + 20, y + 25, angle->grab());
+            painter.drawPixmap(x + 90, y + 25, bracket->grab());
+            bracket->setAttribute(Qt::WA_UnderMouse, false);
+            angle->setAttribute(Qt::WA_UnderMouse, false);
+            QEvent leave(QEvent::Leave);
+            QApplication::sendEvent(bracket, &leave);
+            QApplication::sendEvent(angle, &leave);
+        }
+    }
+    painter.end();
+    if (const auto path = qEnvironmentVariable("SNOW_BRACKET_ICON_PREVIEW"); !path.isEmpty())
+        require(sheet.save(path), "save actual toolbar icons in both themes and four states");
+    auto& language = LanguageManager::instance();
+    for (const auto& locale :
+         {QStringLiteral("en_US"), QStringLiteral("zh_CN"), QStringLiteral("zh_TW")}) {
+        require(language.setLanguage(locale), "load bracket translations");
+        QCoreApplication::processEvents();
+        require(bracket->accessibleName() ==
+                    QCoreApplication::translate("ScreenshotToolPalette", "Bracket annotation"),
+                "bracket accessible name retranslates with the toolbar");
+    }
+    require(language.setLanguage(QStringLiteral("en_US")), "restore test language");
+}
+
 void angleSettingsAndWheelPreserveIndependentProperties() {
     ScreenshotToolPalette palette(ScreenshotToolPalette::Options{});
     int activations = 0;
@@ -13263,8 +13388,9 @@ void distanceSettingsExposeIndependentPropertiesAndHoverWheel() {
     require(emitted.unit == SnowCanvasDistanceUnit::Mm &&
                 properties == SnowCanvasDistanceStylePropertyUnit,
             "millimeter selection should commit a unit edit");
-    units->button(static_cast<int>(SnowCanvasDistanceUnit::Px))->click();
     for (QAbstractButton* button : units->buttons()) {
+        if (button->objectName() == QStringLiteral("screenshotDistanceMoreUnitsButton"))
+            continue;
         button->click();
         require(properties == SnowCanvasDistanceStylePropertyUnit &&
                     emitted.unit == static_cast<SnowCanvasDistanceUnit>(units->id(button)),
@@ -13444,6 +13570,7 @@ void distanceSettingsExposeIndependentPropertiesAndHoverWheel() {
     hiddenOptions.showSpeechBubbleTool = false;
     hiddenOptions.showArrowTool = false;
     hiddenOptions.showAngleTool = false;
+    hiddenOptions.showBracketTool = false;
     hiddenOptions.toolbarLayout = snow_shot::storage::ScreenshotToolbarLayout{
         {{QStringLiteral("shape")}}, {QStringLiteral("distance")}};
     ScreenshotToolPalette hiddenPalette(hiddenOptions);
@@ -13483,6 +13610,153 @@ void distanceSettingsExposeIndependentPropertiesAndHoverWheel() {
                     QStringLiteral("distance"),
             "a custom Distance option should publish the same tool command as its shortcut");
     hiddenPalette.hide();
+}
+
+void distanceMoreUnitsFollowAuthoritativeSelection() {
+    ScreenshotToolPalette palette(ScreenshotToolPalette::Options{});
+    palette.setActiveTool(ScreenshotToolPalette::Tool::Distance);
+    palette.show();
+    QCoreApplication::processEvents();
+    const auto moreButton = [&]() {
+        return palette.findChild<adqt::widgets::AdRadio*>(
+            QStringLiteral("screenshotDistanceMoreUnitsButton"));
+    };
+    auto* more = moreButton();
+    auto* group = palette.findChild<QWidget*>(QStringLiteral("screenshotDistanceUnitButtonGroup"))
+                      ->findChild<adqt::widgets::AdRadioButtonGroup*>();
+    auto* popover = popoverForTrigger(more);
+    require(more && popover && group && group->buttons().size() == 5 &&
+                !group->button(static_cast<int>(SnowCanvasDistanceUnit::Px)) &&
+                popover->triggers() ==
+                    adqt::widgets::AdPopover::Triggers(adqt::widgets::AdPopover::Trigger::Hover) &&
+                popover->placement() == adqt::widgets::AdPopover::Placement::Bottom &&
+                popover->popupLayerMode() == adqt::widgets::AdPopover::PopupLayerMode::QtTool &&
+                !popover->contentWidget(),
+            "distance units have four inline units and a lazy native hover More popover");
+    const QIcon moreIcon = more->icon();
+    SnowCanvasDistanceStyle current = palette.creationStyleDefaults().distance;
+    int edits = 0;
+    palette.setStyleEditHandler([&](const SnowCanvasStyleEdit& edit) {
+        const auto* distance = std::get_if<SnowCanvasDistanceEdit>(&edit);
+        require(distance && distance->properties == SnowCanvasDistanceStylePropertyUnit &&
+                    distance->style.factor == current.factor,
+                "unit choices change only the suffix, preserving calibration");
+        current = distance->style;
+        ++edits;
+        palette.rememberStyleEdit(edit);
+        return true;
+    });
+    more->click();
+    require(edits == 0 && !more->isChecked() &&
+                group->checkedId() == static_cast<int>(SnowCanvasDistanceUnit::Cm),
+            "clicking More cannot change the current unit or its highlight");
+    const QPoint previousCursor = QCursor::pos();
+    const auto restoreCursor = qScopeGuard([&] { QCursor::setPos(previousCursor); });
+    const QPoint local = more->rect().center();
+    QCursor::setPos(more->mapToGlobal(local));
+    QEventLoop loop;
+    QObject::connect(popover, &adqt::widgets::AdPopover::visibleChanged, &loop,
+                     [&loop](bool visible) {
+                         if (visible)
+                             loop.quit();
+                     });
+    QEnterEvent enter(local, more->mapTo(more->window(), local), more->mapToGlobal(local));
+    QApplication::sendEvent(more, &enter);
+    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+    if (!popover->isVisible())
+        loop.exec();
+    require(popover->isVisible() && popover->contentWidget() &&
+                popover->contentWidget()->isVisible() && edits == 0 && !more->isChecked(),
+            "hovering More opens visible unit choices without changing selection");
+    const auto buttons = popover->contentWidget()->findChildren<adqt::widgets::AdButton*>();
+    const QStringList labels{QStringLiteral("px"), QStringLiteral("pt"), QStringLiteral("in"),
+                             QStringLiteral("ft"), QString::fromUtf8("μm")};
+    const SnowCanvasDistanceUnit values[] = {SnowCanvasDistanceUnit::Px, SnowCanvasDistanceUnit::Pt,
+                                             SnowCanvasDistanceUnit::In, SnowCanvasDistanceUnit::Ft,
+                                             SnowCanvasDistanceUnit::Um};
+    require(buttons.size() == 5, "the overflow contains exactly five unit icons");
+    for (int index = 0; index < buttons.size(); ++index) {
+        require(buttons[index]->accessibleName() == labels[index] &&
+                    buttons[index]->text().isEmpty() &&
+                    (index == 0 || buttons[index]->x() > buttons[index - 1]->x()),
+                "unit icons appear in the requested horizontal order with accessible labels");
+        popover->show();
+        buttons[index]->click();
+        require(current.unit == values[index] && edits == index + 1 && more->isChecked() &&
+                    !popover->isVisible() && more->icon().cacheKey() == moreIcon.cacheKey(),
+                "an overflow choice highlights the fixed More icon after closing the popover");
+        popover->show();
+        for (int option = 0; option < buttons.size(); ++option)
+            require((buttons[option]->buttonStyle() ==
+                     adqt::widgets::AdButton::ButtonStyle::Tonal) == (option == index),
+                    "only the current overflow unit is highlighted on reopening");
+        popover->hide();
+    }
+    group->button(static_cast<int>(SnowCanvasDistanceUnit::Mm))->click();
+    require(current.unit == SnowCanvasDistanceUnit::Mm && !more->isChecked(),
+            "inline unit selection clears More highlighting");
+    for (auto* button : buttons)
+        require(button->buttonStyle() != adqt::widgets::AdButton::ButtonStyle::Tonal,
+                "inline selection clears all overflow option highlights");
+
+    SnowCanvasStyleToolbarState selected;
+    selected.source = SnowCanvasStyleToolbarSource::SelectedDistance;
+    selected.selectedElementCount = 2;
+    selected.distanceStyle = current;
+    selected.distanceStyle.unit = SnowCanvasDistanceUnit::Um;
+    selected.distanceStyleMixed = SnowCanvasDistanceStyleMixedUnit;
+    const int beforeStateChanges = edits;
+    palette.setStyleToolbarState(selected);
+    more->click();
+    require(group->checkedId() == -1 && !more->isChecked() && edits == beforeStateChanges,
+            "mixed units have no highlighted segment, including after clicking More");
+    for (auto* button : buttons)
+        require(button->buttonStyle() != adqt::widgets::AdButton::ButtonStyle::Tonal,
+                "mixed units have no highlighted overflow option");
+    selected.distanceStyleMixed = 0;
+    palette.setStyleToolbarState(selected);
+    require(more->isChecked() &&
+                buttons.last()->buttonStyle() == adqt::widgets::AdButton::ButtonStyle::Tonal &&
+                edits == beforeStateChanges,
+            "external selected-unit state refreshes both highlights without emitting edits");
+    palette.setActiveTool(ScreenshotToolPalette::Tool::Arrow);
+    palette.setActiveTool(ScreenshotToolPalette::Tool::Distance);
+    palette.setStyleToolbarState(selected);
+    QCoreApplication::processEvents();
+    more = moreButton();
+    require(more && more->isChecked(), "More highlighting survives editor reuse");
+    popover = showPopoverForTrigger(more);
+    clickPopoverStyleControl(popover, "pt");
+    require(edits == beforeStateChanges + 1 && current.unit == SnowCanvasDistanceUnit::Pt &&
+                more->isChecked(),
+            "reused popup callbacks commit exactly once");
+
+    popover = showPopoverForTrigger(more);
+    const auto popupButtons = popover->contentWidget()->findChildren<adqt::widgets::AdButton*>();
+    const QSize popupButtonSize = popupButtons.first()->size();
+    const QSize triggerSize = more->size();
+    require(palette.setPhysicalScale(1.5), "distance toolbar accepts a changed display scale");
+    QCoreApplication::processEvents();
+    require(more->size() ==
+                    QSize(qRound(triggerSize.width() * 1.5), qRound(triggerSize.height() * 1.5)) &&
+                popupButtons.first()->size() == popupButtonSize && more->isChecked(),
+            "More scales with toolbar segments while the popup keeps its own display scale");
+    require(palette.setPhysicalScale(1.0), "restore the distance toolbar scale");
+    popover->hide();
+
+    auto& language = snow_shot::presentation::LanguageManager::instance();
+    const auto previousLanguage = language.languagePreference();
+    const auto restoreLanguage =
+        qScopeGuard([&] { static_cast<void>(language.setLanguage(previousLanguage)); });
+    for (const auto& locale :
+         {QStringLiteral("en_US"), QStringLiteral("zh_CN"), QStringLiteral("zh_TW")}) {
+        require(language.setLanguage(locale), "load distance unit translations");
+        QCoreApplication::processEvents();
+        require(more->accessibleName() == QCoreApplication::translate("ScreenshotToolPalette",
+                                                                      "More distance units") &&
+                    more->isChecked(),
+                "More retranslates without losing its selected state");
+    }
 }
 
 void distanceActualValueUpdatesTheCanvasAndUndo() {
@@ -13557,6 +13831,25 @@ void distanceActualValueUpdatesTheCanvasAndUndo() {
             "undo should restore the factor and actual value input");
     require(canvas.redo() && value->displayText() == QStringLiteral("25.125"),
             "redo should restore the user's actual value");
+    auto* more = palette.findChild<adqt::widgets::AdRadio*>(
+        QStringLiteral("screenshotDistanceMoreUnitsButton"));
+    require(more, "selected distance exposes More units");
+    const QStringList unitLabels{QStringLiteral("px"), QStringLiteral("pt"), QStringLiteral("in"),
+                                 QStringLiteral("ft"), QString::fromUtf8("μm")};
+    for (const auto& unitLabel : unitLabels) {
+        const auto before = canvas.canvasDistanceStyle();
+        clickPopoverStyleControl(showPopoverForTrigger(more), unitLabel.toUtf8().constData());
+        require(more->isChecked() && canvas.canvasDistanceStyle().factor == before.factor &&
+                    value->displayText() == QStringLiteral("25.125") &&
+                    record(QStringLiteral("Text")).value(QStringLiteral("text")).toString() ==
+                        QStringLiteral("25.125 %1").arg(unitLabel) &&
+                    record(QStringLiteral("Arrow")).value(QStringLiteral("points")) == points,
+                "unit changes preserve the value and geometry while rendering the selected suffix");
+        require(canvas.undo() && canvas.canvasDistanceStyle() == before && !more->isChecked(),
+                "undoing overflow selection restores the inline unit and clears More");
+        require(canvas.redo() && more->isChecked(), "redo restores More highlighting");
+        require(canvas.undo() && !more->isChecked(), "restore mm for the next unit");
+    }
     const double factor = canvas.canvasDistanceStyle().factor;
     mouse(QEvent::MouseButtonPress, {130, 220}, Qt::LeftButton, Qt::LeftButton);
     mouse(QEvent::MouseMove, {160, 260}, Qt::NoButton, Qt::LeftButton);
@@ -19786,6 +20079,7 @@ void regionSwitcherRetranslatesAndRenders() {
 void runScreenshotStyleBindingTests();
 void runScreenshotTextAlignmentTests();
 void runAngleStyleBindingTests();
+void runBracketStyleBindingTests();
 void runScreenshotSerialNumberRestartTests();
 void runScreenshotStylePersistenceFailureTest();
 void runWatermarkPersistenceTests();
@@ -20267,6 +20561,11 @@ int main(int argc, char** argv) {
         magnifierControlsRetranslateAndRenderPreviews();
         return 0;
     }
+    if (application.arguments().contains(QStringLiteral("--bracket-only"))) {
+        bracketSettingsAndIcons();
+        runBracketStyleBindingTests();
+        return 0;
+    }
     if (application.arguments().contains(QStringLiteral("--angle-only"))) {
         angleSettingsAndWheelPreserveIndependentProperties();
         runAngleStyleBindingTests();
@@ -20276,6 +20575,7 @@ int main(int argc, char** argv) {
         arrowAndLineRemainDirectWhenConfiguredIndividually();
         editorlessToolsRejectStaleStyleToolbarState();
         distanceSettingsExposeIndependentPropertiesAndHoverWheel();
+        distanceMoreUnitsFollowAuthoritativeSelection();
         distanceActualValueUpdatesTheCanvasAndUndo();
         return 0;
     }
@@ -20610,6 +20910,7 @@ int main(int argc, char** argv) {
     disabledSelectionOpacityRejectsWheelSteps();
     magnifierControlsRetranslateAndRenderPreviews();
     angleSettingsAndWheelPreserveIndependentProperties();
+    distanceMoreUnitsFollowAuthoritativeSelection();
     distanceActualValueUpdatesTheCanvasAndUndo();
     arrowRatioEditorAdjustsAndResets();
     arrowStyleControlsExposeAndEmitAllStyleProperties();

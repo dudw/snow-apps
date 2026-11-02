@@ -59,6 +59,7 @@ enum class Item {
     Distance,
     Angle,
     SpeechBubble,
+    Bracket,
 };
 
 enum class Icon {
@@ -84,6 +85,7 @@ enum class Icon {
     TableRecognition,
     RecordScreen,
     PinToScreen,
+    PinWindowToScreen,
     TextRecognition,
     TextTranslation,
     ScrollingScreenshot,
@@ -108,6 +110,7 @@ enum class Icon {
     Distance,
     Angle,
     SpeechBubble,
+    Bracket,
 };
 
 struct Descriptor {
@@ -140,6 +143,9 @@ struct EditorDescriptor {
          Icon::Distance},
         {Item::Angle, "angle",
          QT_TRANSLATE_NOOP("DrawingToolbarEditorSettingsWidget", "Angle annotation"), Icon::Angle},
+        {Item::Bracket, "bracket",
+         QT_TRANSLATE_NOOP("DrawingToolbarEditorSettingsWidget", "Bracket annotation"),
+         Icon::Bracket},
         {Item::Line, "line", QT_TRANSLATE_NOOP("DrawingToolbarEditorSettingsWidget", "Line"),
          Icon::Line},
         {Item::FreeDraw, "free-draw",
@@ -219,6 +225,9 @@ struct EditorDescriptor {
             {"pin-to-screen", "ScreenshotToolbarEditorSettingsWidget",
              QT_TRANSLATE_NOOP("ScreenshotToolbarEditorSettingsWidget", "Pin to screen"),
              Icon::PinToScreen},
+            {"pin-window-to-screen", "ScreenshotToolbarEditorSettingsWidget",
+             QT_TRANSLATE_NOOP("ScreenshotToolbarEditorSettingsWidget", "Pin Window to Screen"),
+             Icon::PinWindowToScreen},
             {"text-recognition", "ScreenshotToolbarEditorSettingsWidget",
              QT_TRANSLATE_NOOP("ScreenshotToolbarEditorSettingsWidget", "Text recognition"),
              Icon::TextRecognition},
@@ -420,8 +429,8 @@ editorDescriptors(storage::ScreenshotToolbarLayoutKind kind) {
         {QStringLiteral("select")},
         {QStringLiteral("select-separator")},
         {QStringLiteral("shape")},
-        {QStringLiteral("angle"), QStringLiteral("distance"), QStringLiteral("line"),
-         QStringLiteral("arrow")},
+        {QStringLiteral("bracket"), QStringLiteral("angle"), QStringLiteral("distance"),
+         QStringLiteral("line"), QStringLiteral("arrow")},
         {QStringLiteral("free-draw")},
         {QStringLiteral("magnifier"), QStringLiteral("spotlight"), QStringLiteral("highlighter")},
         {QStringLiteral("text")},
@@ -452,7 +461,7 @@ editorDescriptors(storage::ScreenshotToolbarLayoutKind kind) {
          QStringLiteral("latex-recognition"), QStringLiteral("barcode-recognition"),
          QStringLiteral("table-recognition")},
         {QStringLiteral("record-screen")},
-        {QStringLiteral("pin-to-screen")},
+        {QStringLiteral("pin-window-to-screen"), QStringLiteral("pin-to-screen")},
         {QStringLiteral("text-recognition")},
         {QStringLiteral("text-translation")},
         {QStringLiteral("scrolling-screenshot")},
@@ -613,6 +622,23 @@ normalizedLayout(const storage::ScreenshotToolbarLayout& input, const QStringLis
             hidden.insert(QStringLiteral("print"));
         }
     }
+    if (known.contains(QStringLiteral("pin-window-to-screen")) &&
+        !positioned.contains(QStringLiteral("pin-window-to-screen")) &&
+        !hidden.contains(QStringLiteral("pin-window-to-screen"))) {
+        for (QStringList& position : result.positions) {
+            const qsizetype pin = position.indexOf(QStringLiteral("pin-to-screen"));
+            if (pin >= 0) {
+                position.insert(pin, QStringLiteral("pin-window-to-screen"));
+                positioned.insert(QStringLiteral("pin-window-to-screen"));
+                break;
+            }
+        }
+        if (!positioned.contains(QStringLiteral("pin-window-to-screen")) &&
+            hidden.contains(QStringLiteral("pin-to-screen"))) {
+            result.hidden.push_back(QStringLiteral("pin-window-to-screen"));
+            hidden.insert(QStringLiteral("pin-window-to-screen"));
+        }
+    }
     if (known.contains(QStringLiteral("airdrop")) &&
         !positioned.contains(QStringLiteral("airdrop")) &&
         !hidden.contains(QStringLiteral("airdrop"))) {
@@ -721,8 +747,8 @@ normalizedLayout(const storage::ScreenshotToolbarLayout& input, const QStringLis
     }
     auto previousDrawingDefaults = defaultLayout;
     QStringList missingAnnotations;
-    for (const QString& id :
-         {QStringLiteral("angle"), QStringLiteral("distance"), QStringLiteral("magnifier")}) {
+    for (const QString& id : {QStringLiteral("bracket"), QStringLiteral("angle"),
+                              QStringLiteral("distance"), QStringLiteral("magnifier")}) {
         if (known.contains(id) && !positioned.contains(id) && !hidden.contains(id)) {
             missingAnnotations.push_back(id);
             for (auto& position : previousDrawingDefaults)
@@ -972,6 +998,8 @@ moveItemToHidden(const storage::ScreenshotToolbarLayout& input,
         return custom::DistanceAnnotation();
     case Icon::Angle:
         return custom::AngleAnnotation();
+    case Icon::Bracket:
+        return custom::BracketAnnotation();
     case Icon::Line:
         return custom::ToolLine();
     case Icon::FreeDraw:
@@ -1012,6 +1040,8 @@ moveItemToHidden(const storage::ScreenshotToolbarLayout& input,
         return custom::RecordScreen();
     case Icon::PinToScreen:
         return custom::PinToScreen();
+    case Icon::PinWindowToScreen:
+        return custom::PinWindowToScreen();
     case Icon::TextRecognition:
         return custom::TextRecognition();
     case Icon::TextTranslation:

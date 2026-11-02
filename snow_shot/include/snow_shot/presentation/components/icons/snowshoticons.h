@@ -42,6 +42,7 @@ AlignCenterHorizontal(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef AngleType360(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef AngleUnitDegrees(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef AngleUnitRadians(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef ApplyCrop(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ArrowRatio(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ArrowShaftPlain(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ArrowShaftTapered(const adqt::icons::IconColors& colors = {});
@@ -95,6 +96,7 @@ ArrowheadTriangleStart(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef AutoScroll(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef AutoScrollInterval(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef Blur(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef BracketAnnotation(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef
 BrushPressureSensitive(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef BrushRegular(const adqt::icons::IconColors& colors = {});
@@ -106,10 +108,14 @@ BrushPressureSensitive(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef Disabled(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceAnnotation(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceUnitCm(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef DistanceUnitFt(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef DistanceUnitIn(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceUnitKm(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceUnitM(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceUnitMm(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef DistanceUnitPt(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceUnitPx(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef DistanceUnitUm(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistanceValueScale(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistributeHorizontal(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef DistributeVertical(const adqt::icons::IconColors& colors = {});
@@ -161,6 +167,7 @@ MoveSelectionVertical(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef PinToScreen(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef
 PinToScreenManagement(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef PinWindowToScreen(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef PinnedWindowBorder(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef PinnedWindowShadow(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef QuickSave(const adqt::icons::IconColors& colors = {});
@@ -242,6 +249,7 @@ SequenceNumberSolidSquare(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef SourceRegionOutline(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef TableRecognition(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef TextRecognition(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef TextType(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ToolArrow(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ToolEraser(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ToolFilter(const adqt::icons::IconColors& colors = {});
@@ -263,9 +271,15 @@ SequenceNumberSolidSquare(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef WheelMouse(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef Window(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef WindowGroupSwitch(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef
+WindowUnderCursorAlwaysOnTop(const adqt::icons::IconColors& colors = {});
 } // namespace outlined
 
 namespace twotone {
+[[nodiscard]] adqt::icons::IconRef LiveWindowClosed(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef LiveWindowMinimized(const adqt::icons::IconColors& colors = {});
+[[nodiscard]] adqt::icons::IconRef
+LiveWindowUnavailable(const adqt::icons::IconColors& colors = {});
 [[nodiscard]] adqt::icons::IconRef ScreenshotFeature(const adqt::icons::IconColors& colors = {});
 } // namespace twotone
 

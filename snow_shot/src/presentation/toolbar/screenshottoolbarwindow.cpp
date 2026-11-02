@@ -222,6 +222,10 @@ void ScreenshotToolbarWindow::connectToolCommands(ScreenshotToolPalette& toolPal
         m_commands.setAngleTool();
         setActiveToolAndReposition(ScreenshotToolPalette::Tool::Angle);
     });
+    connect(&toolPalette, &ScreenshotToolPalette::bracketToolRequested, this, [this]() {
+        m_commands.setBracketTool();
+        setActiveToolAndReposition(ScreenshotToolPalette::Tool::Bracket);
+    });
     connect(&toolPalette, &ScreenshotToolPalette::arrowRequested, this, [this]() {
         m_commands.setArrowTool();
         setActiveToolAndReposition(ScreenshotToolPalette::Tool::Arrow);
@@ -335,6 +339,8 @@ void ScreenshotToolbarWindow::connectActionCommands(ScreenshotToolPalette& toolP
             [this]() { m_commands.startScreenRecording(); });
     connect(&toolPalette, &ScreenshotToolPalette::pinRequested, this,
             [this]() { m_commands.pinSelectionToScreen(); });
+    connect(&toolPalette, &ScreenshotToolPalette::pinWindowRequested, this,
+            [this]() { m_commands.pinWindowSelectionToScreen(); });
     connect(&toolPalette, &ScreenshotToolPalette::quickSaveRequested, this,
             [this]() { m_commands.quickSaveSelection(); });
     connect(&toolPalette, &ScreenshotToolPalette::airDropRequested, this,

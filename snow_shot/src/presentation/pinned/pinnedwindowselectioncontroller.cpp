@@ -100,10 +100,10 @@ void PinnedWindowSelectionController::unregisterWindow(ScreenshotPinnedWindow* w
 }
 
 bool PinnedWindowSelectionController::isSelectable(const ScreenshotPinnedWindow* window) const {
-    return window && m_windowIndex.contains(window) && window->m_presented &&
-           window->m_firstContentFramePublished && !window->m_closing && window->isVisible() &&
-           !window->isMinimized() && !window->m_thumbnailMode && !window->hideToTopActive() &&
-           !window->m_clickThroughActive &&
+    return window && !window->isLiveWindow() && m_windowIndex.contains(window) &&
+           window->m_presented && window->m_firstContentFramePublished && !window->m_closing &&
+           window->isVisible() && !window->isMinimized() && !window->m_thumbnailMode &&
+           !window->hideToTopActive() && !window->m_clickThroughActive &&
            (!window->m_groupManager ||
             window->groupId() == window->m_groupManager->activeGroupId());
 }
@@ -165,6 +165,35 @@ void PinnedWindowSelectionController::clearSelection() {
         if (window)
             window->setWindowSelected(false);
     notifySelectionChanged();
+}
+
+void PinnedWindowSelectionController::selectAll(
+    const QList<QPointer<ScreenshotPinnedWindow>>& targets) {
+    cancelGeometry();
+    QList<QPointer<ScreenshotPinnedWindow>> selected;
+    QSet<const ScreenshotPinnedWindow*> index;
+    for (const auto& window : targets) {
+        if (isSelectable(window) && !index.contains(window)) {
+            selected.append(window);
+            index.insert(window);
+        }
+    }
+    if (index == m_selectedIndex)
+        return;
+    for (const auto& window : std::as_const(m_selected))
+        if (window && !index.contains(window))
+            window->setWindowSelected(false);
+    m_selected = std::move(selected);
+    m_selectedIndex = std::move(index);
+    for (const auto& window : std::as_const(m_selected))
+        window->setWindowSelected(true);
+    notifySelectionChanged();
+}
+
+void PinnedWindowSelectionController::destroyWindows(
+    ScreenshotPinnedWindow* owner, const QList<QPointer<ScreenshotPinnedWindow>>& targets) {
+    if (owner && !targets.isEmpty())
+        confirmDestroy(owner, targets, true);
 }
 
 void PinnedWindowSelectionController::showFailure(QWidget* owner, const QString& message) {
@@ -373,7 +402,8 @@ void PinnedWindowSelectionController::buildContextMenu(ScreenshotPinnedWindow* o
 }
 
 void PinnedWindowSelectionController::confirmDestroy(
-    ScreenshotPinnedWindow* owner, const QList<QPointer<ScreenshotPinnedWindow>>& targets) {
+    ScreenshotPinnedWindow* owner, const QList<QPointer<ScreenshotPinnedWindow>>& targets,
+    bool displayed) {
     if (m_destroyConfirmation) {
         m_destroyConfirmation->setOpen(true);
         return;
@@ -382,11 +412,12 @@ void PinnedWindowSelectionController::confirmDestroy(
     for (const auto& window : targets)
         if (window && !ids.contains(window->persistenceId()))
             ids.append(window->persistenceId());
-    const auto destroy = [this, ids, targets, owner = QPointer(owner)] {
+    const auto destroy = [this, ids, targets, displayed, owner = QPointer(owner)] {
         if (m_destroyRecords) {
             const auto result = m_destroyRecords(ids);
             if (!result.success) {
-                showFailure(owner, tr("The selected windows could not be destroyed."));
+                showFailure(owner, displayed ? tr("The displayed windows could not be destroyed.")
+                                             : tr("The selected windows could not be destroyed."));
                 return;
             }
         }
@@ -406,6 +437,7 @@ void PinnedWindowSelectionController::confirmDestroy(
     modal->setWindowModality(Qt::ApplicationModal);
     modal->setPreset(adqt::widgets::AdModal::Preset::Confirm);
     modal->setProperty("pinnedSelectionCount", ids.size());
+    modal->setProperty("pinnedDisplayedBatch", displayed);
     modal->setAcceptAccentRole(adqt::widgets::AdButton::AccentRole::Danger);
     modal->setStandardButtons(adqt::widgets::AdModal::StandardButton::Ok |
                               adqt::widgets::AdModal::StandardButton::Cancel);
@@ -435,10 +467,15 @@ void PinnedWindowSelectionController::retranslateUi() {
         }
     }
     if (m_destroyConfirmation) {
-        m_destroyConfirmation->setWindowTitle(tr("Destroy selected windows"));
+        const bool displayed = m_destroyConfirmation->property("pinnedDisplayedBatch").toBool();
+        const int count = m_destroyConfirmation->property("pinnedSelectionCount").toInt();
+        m_destroyConfirmation->setWindowTitle(displayed ? tr("Destroy displayed windows")
+                                                        : tr("Destroy selected windows"));
         m_destroyConfirmation->setText(
-            tr("Destroy %n selected window(s)? This action cannot be undone.", nullptr,
-               m_destroyConfirmation->property("pinnedSelectionCount").toInt()));
+            displayed ? tr("Destroy %n displayed window(s)? This action cannot be undone.", nullptr,
+                           count)
+                      : tr("Destroy %n selected window(s)? This action cannot be undone.", nullptr,
+                           count));
         m_destroyConfirmation->setAcceptText(tr("Destroy"));
         m_destroyConfirmation->setRejectText(tr("Cancel"));
     }

@@ -204,6 +204,22 @@
             <translation>粗體</translation>
         </message>
         <message>
+            <source>Bracket annotation</source>
+            <translation>括號標註</translation>
+        </message>
+        <message>
+            <source>Bracket stroke color</source>
+            <translation>括號描邊顏色</translation>
+        </message>
+        <message>
+            <source>Bracket stroke color %1</source>
+            <translation>括號描邊顏色 %1</translation>
+        </message>
+        <message>
+            <source>Bracket stroke width %1</source>
+            <translation>括號描邊寬度 %1</translation>
+        </message>
+        <message>
             <source>Brightness</source>
             <translation>亮度</translation>
         </message>
@@ -330,6 +346,10 @@
         <message>
             <source>Current arrow width</source>
             <translation>目前箭頭寬度</translation>
+        </message>
+        <message>
+            <source>Current bracket stroke width</source>
+            <translation>目前括號描邊寬度</translation>
         </message>
         <message>
             <source>Current brush eraser width</source>
@@ -824,6 +844,10 @@
             <translation>混合</translation>
         </message>
         <message>
+            <source>More distance units</source>
+            <translation>更多距離單位</translation>
+        </message>
+        <message>
             <source>Mosaic</source>
             <translation>馬賽克</translation>
         </message>
@@ -958,6 +982,10 @@
         <message>
             <source>Pick color from canvas</source>
             <translation>從畫布擷取色彩</translation>
+        </message>
+        <message>
+            <source>Pin Window to Screen</source>
+            <translation>固定視窗到螢幕</translation>
         </message>
         <message>
             <source>Pin to screen</source>
@@ -1568,6 +1596,14 @@
             <translation>cm</translation>
         </message>
         <message>
+            <source>ft</source>
+            <translation>ft</translation>
+        </message>
+        <message>
+            <source>in</source>
+            <translation>in</translation>
+        </message>
+        <message>
             <source>km</source>
             <translation>km</translation>
         </message>
@@ -1589,12 +1625,20 @@
             <translation>ms</translation>
         </message>
         <message>
+            <source>pt</source>
+            <translation>pt</translation>
+        </message>
+        <message>
             <source>px</source>
             <translation>px</translation>
         </message>
         <message>
             <source>{text} represents the current watermark text; timestamp formats such as {YYYY-MM-DD_HH-mm-ss} are supported</source>
             <translation>{text} 代表目前的浮水印文字；支援 {YYYY-MM-DD_HH-mm-ss} 等時間戳記格式</translation>
+        </message>
+        <message>
+            <source>μm</source>
+            <translation>μm</translation>
         </message>
     </context>
     <context>

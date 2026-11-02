@@ -153,9 +153,18 @@ void shortcutAndMouseResets(settings::BuiltInSettingsBackend& backend) {
     require(configuration.setValue(QStringLiteral("global_shortcuts/global_canvas"),
                                    QJsonArray{QStringLiteral("Ctrl+Alt+F10")}),
             "customize retained other shortcut before resetting");
+#ifdef Q_OS_WIN
+    const QString topmostKey =
+        QStringLiteral("global_shortcuts/toggle_window_under_cursor_always_on_top");
+    require(configuration.setValue(topmostKey, QJsonArray{QStringLiteral("Ctrl+Alt+F11")}),
+            "customize Mini window-under-cursor topmost before resetting");
+#endif
     require(backend.resetSection(settings::SettingsSectionReset::OtherShortcuts),
             "Mini other shortcut reset must skip unavailable selected-text translation");
     requireDefault(QStringLiteral("global_shortcuts/global_canvas"));
+#ifdef Q_OS_WIN
+    requireDefault(topmostKey);
+#endif
 
     require(backend.applyGlobalMouseCombination(
                 settings::SettingsGlobalMouseAction::ScreenshotCopy,
@@ -239,8 +248,10 @@ void screenshotSoundPersistsAndResets(settings::BuiltInSettingsBackend& backend,
 
 void screenshotBehaviorReset(settings::BuiltInSettingsBackend& backend) {
     auto& configuration = storage::ApplicationStorage::instance().configuration();
-    for (const QString& key : {QStringLiteral("screenshot_selection/smart_selection"),
-                               QStringLiteral("screenshot/shutter_sound_notification"),
+    require(configuration.setValue(QStringLiteral("screenshot_selection/smart_selection"),
+                                   QStringLiteral("disabled")),
+            "customize smart selection mode");
+    for (const QString& key : {QStringLiteral("screenshot/shutter_sound_notification"),
                                QStringLiteral("screenshot/screenshot_sound_notification"),
                                QStringLiteral("screenshot/confirm_before_exiting_via_shortcut")}) {
         require(

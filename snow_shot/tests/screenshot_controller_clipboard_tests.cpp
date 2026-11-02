@@ -1,13 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "canvas_automatic_selection_test_support.h"
+#include "screenshot_controller_test_access.h"
+#include "snow_shot/app/applicationcontroller.h"
+#include "snow_shot/app/shellimagelaunch.h"
+#include "snow_shot/presentation/languagemanager.h"
 #include "snow_shot/presentation/screenshotoverlaywindow.h"
 #include "snow_shot/presentation/screenshotcontroller.h"
 #include "snow_shot/presentation/screenshotexportartifact.h"
+#include "snow_shot/presentation/screenshotselectionparams.h"
 #include "snow_shot/presentation/screenshotpinnedwindow.h"
 #include "snow_shot/presentation/styles/thememanager.h"
 #include "snow_shot/presentation/collagewindow.h"
 #include "snow_shot/presentation/imagesplitwindow.h"
+#include "snow_shot/presentation/imageeditingwindow.h"
+#include "snow_shot/presentation/screenshottoolpalette.h"
+#include "widgets/modal.h"
 #include "snow_shot/storage/applicationstorage.h"
+#include "snow_shot/storage/capturehistoryrepository.h"
 #include "snow_shot/storage/settingsadapters.h"
 #include "../src/presentation/pinned/screenshotclipboardplacementgeometry.h"
 
@@ -22,11 +31,20 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMimeData>
+#include <QJsonArray>
 #include <QScopeGuard>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QUrl>
+
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <shellapi.h>
+#endif
 
 #include <cstdlib>
 #include <iostream>
@@ -72,6 +90,34 @@ QImage fixture() {
     image.setPixelColor(0, 0, QColor(201, 19, 79, 43));
     image.setColorSpace(QColorSpace::SRgb);
     return image;
+}
+
+std::pair<QImage, QString> captureClipboardOutput() {
+#ifdef Q_OS_WIN
+    waitUntil([] { return OpenClipboard(nullptr) != FALSE; }, "open native clipboard output");
+    const auto close = qScopeGuard([] { CloseClipboard(); });
+    const auto handle = static_cast<HGLOBAL>(GetClipboardData(RegisterClipboardFormatW(L"PNG")));
+    const auto* data = handle ? static_cast<const char*>(GlobalLock(handle)) : nullptr;
+    QImage image;
+    if (data) {
+        image =
+            QImage::fromData(QByteArray(data, static_cast<qsizetype>(GlobalSize(handle))), "PNG");
+        GlobalUnlock(handle);
+    }
+    QString path;
+    const auto drop = static_cast<HDROP>(GetClipboardData(CF_HDROP));
+    if (drop && DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0) > 0) {
+        const UINT length = DragQueryFileW(drop, 0, nullptr, 0);
+        path.resize(length + 1);
+        DragQueryFileW(drop, 0, reinterpret_cast<LPWSTR>(path.data()), length + 1);
+        path.resize(length);
+    }
+    return {image, path};
+#else
+    const auto* mime = QApplication::clipboard()->mimeData();
+    return {QImage::fromData(mime->data(QStringLiteral("image/png"))),
+            mime->hasUrls() ? mime->urls().constFirst().toLocalFile() : QString{}};
+#endif
 }
 
 void combinedCopiesPreserveImagePlacementAndAppearance(ScreenshotController& controller) {
@@ -204,6 +250,104 @@ void imageToolsPreferInlineClipboardPixels() {
         split.shutdown();
     }
 }
+
+void capturePinCopiesOnlyWhenEnabled() {
+    const snow_shot::storage::ScreenshotSettings settings;
+    require(!settings.copyAfterPinningToScreen(), "copy after pinning defaults off");
+    for (const bool enabled : {false, true}) {
+        for (const bool copyFile : {false, true}) {
+            QTemporaryDir directory;
+            require(directory.isValid() && settings.setCopyAfterPinningToScreen(enabled) &&
+                        settings.setCopyImageFileToClipboard(copyFile) &&
+                        settings.setAutoSaveAfterExecutionActions({}) &&
+                        settings.setImageSaveDirectory(directory.path()),
+                    "configure capture pin copy independently of automatic saving");
+            QImage sentinel(3, 2, QImage::Format_ARGB32);
+            sentinel.fill(Qt::magenta);
+            sentinel.setColorSpace(QColorSpace::SRgb);
+            require(ScreenshotClipboardService::publishImage(QApplication::clipboard(), sentinel),
+                    "publish a sentinel through the production clipboard boundary");
+            ScreenshotController controller;
+            auto& history = snow_shot::storage::ApplicationStorage::instance().captureHistory();
+            const qsizetype historyCount = history.records().size();
+            const QImage image = fixture();
+            ScreenshotSelectionParams selection;
+            selection.selection = QRect(10, 12, 80, 50);
+            selection.radius = 8;
+            selection.shadowWidth = 4;
+            ScreenshotControllerTestAccess::prepareSelection(controller, image, selection);
+            controller.mcpPinSelectionToScreen();
+            waitUntil(
+                [&] {
+                    return visiblePins().size() == 1 &&
+                           !ScreenshotControllerTestAccess::exportActive(controller);
+                },
+                "capture pin and optional copy must finish offscreen");
+            const QImage pinned = visiblePins().constFirst()->persistenceSnapshot().image;
+            require(!pinned.isNull(), "copy mode must preserve successful pinning");
+            const auto [copied, copiedFile] = captureClipboardOutput();
+            if (enabled) {
+                require(!copied.isNull() &&
+                            copied.convertToFormat(QImage::Format_ARGB32_Premultiplied) ==
+                                pinned.convertToFormat(QImage::Format_ARGB32_Premultiplied),
+                        "clipboard must match the pin including crop, rounded corners and shadow");
+                require(!copiedFile.isEmpty() == copyFile,
+                        "copy after pinning must honor image-file clipboard preferences");
+                if (copyFile)
+                    require(QFileInfo::exists(copiedFile),
+                            "combined copy must retain its temporary file");
+            } else {
+                require(copied.convertToFormat(QImage::Format_ARGB32_Premultiplied) ==
+                                sentinel.convertToFormat(QImage::Format_ARGB32_Premultiplied) &&
+                            copiedFile.isEmpty(),
+                        "disabled copy after pinning must leave the clipboard untouched");
+            }
+            require(QDir(directory.path()).entryList(QDir::Files).isEmpty(),
+                    "clipboard-only pinning must not create an automatic save");
+            waitUntil([&] { return history.records().size() == historyCount + 1; },
+                      "pinning must create one history record regardless of optional copying");
+            require(history.records().constFirst().source ==
+                        snow_shot::storage::CaptureHistorySource::PinnedToScreen,
+                    "the shared pin and copy export must retain the pin history source");
+            closePins();
+        }
+    }
+    // Both execution scenarios select the same output; they must create only one file.
+    QTemporaryDir directory;
+    require(directory.isValid() && settings.setCopyAfterPinningToScreen(true) &&
+                settings.setCopyImageFileToClipboard(true) &&
+                settings.setImageSaveDirectory(directory.path()) &&
+                settings.setAutoSaveAfterExecutionActions(
+                    {QStringLiteral("pin_to_screen"), QStringLiteral("copy_screenshot")}),
+            "configure overlapping pin and copy automatic saves");
+    ScreenshotController controller;
+    ScreenshotSelectionParams selection;
+    selection.selection = QRect(0, 0, 120, 80);
+    ScreenshotControllerTestAccess::prepareSelection(controller, fixture(), selection);
+    controller.mcpPinSelectionToScreen();
+    waitUntil(
+        [&] {
+            return visiblePins().size() == 1 &&
+                   !ScreenshotControllerTestAccess::exportActive(controller) &&
+                   !controller.blocksApplicationUpdate();
+        },
+        "combined pin, clipboard and automatic save must finish");
+    require(QDir(directory.path()).entryList(QDir::Files).size() == 1,
+            "pin and copy must share one automatic save");
+    closePins();
+    const auto clipboardBeforeFailure = captureClipboardOutput();
+    ScreenshotControllerTestAccess::prepareSelection(controller, fixture(), {});
+    controller.mcpPinSelectionToScreen();
+    waitUntil([&] { return !ScreenshotControllerTestAccess::exportActive(controller); },
+              "a rejected pin must finish its export");
+    require(visiblePins().isEmpty() && captureClipboardOutput() == clipboardBeforeFailure &&
+                QDir(directory.path()).entryList(QDir::Files).size() == 1,
+            "a rejected pin must not copy or save anything");
+    require(settings.setCopyAfterPinningToScreen(false) &&
+                settings.setCopyImageFileToClipboard(false) &&
+                settings.setAutoSaveAfterExecutionActions({}),
+            "restore screenshot copy settings");
+}
 } // namespace
 
 int runScreenshotControllerClipboardTests(int argc, char** argv) {
@@ -222,6 +366,109 @@ int runScreenshotControllerClipboardTests(int argc, char** argv) {
                 settings.setShowBorderByDefault(true) && settings.setShowShadowByDefault(false),
             "clipboard controller settings must be isolated and deterministic");
     static_cast<void>(snow_shot::presentation::styles::ThemeManager::instance());
+    if (application.arguments().contains(QStringLiteral("--shell-file-startup-tests"))) {
+        const auto shutdown = qScopeGuard([&] { storage.shutdown(); });
+        auto& configuration = storage.configuration();
+        QMap<QString, QJsonValue> isolated{
+            {QStringLiteral("tray/enabled"), false},
+            {QStringLiteral("mcp/enabled"), false},
+            {QStringLiteral("updates/mode"), QStringLiteral("manual")}};
+        const auto snapshot = configuration.snapshot();
+        for (auto it = snapshot.cbegin(); it != snapshot.cend(); ++it) {
+            if (it.key().startsWith(QStringLiteral("global_shortcuts/")) && it.value().isArray())
+                isolated.insert(it.key(), QJsonArray{});
+            if (it.key().startsWith(QStringLiteral("global_mouse/")) && it.value().isObject())
+                isolated.insert(it.key(), QJsonObject{});
+        }
+        require(configuration.setValues(isolated),
+                "startup fixture disables global input and updates");
+        snow_shot::presentation::LanguageManager::instance().initialize();
+        snow_shot::presentation::styles::ThemeManager::instance().initialize(application);
+        const auto path = directory.filePath(QStringLiteral("startup.png"));
+        const auto source = fixture();
+        require(source.save(path, "PNG"), "write shell startup fixture");
+        for (const auto& selected : {path, directory.filePath(QStringLiteral("missing.png")),
+                                     QStringLiteral("relative.png")}) {
+            snow_shot::app::ApplicationController controller(application);
+            int maintenance = 0;
+            controller.start(snow_shot::app::shellImageLaunchArguments({selected}), [&] {
+                ++maintenance;
+                if (selected == path) {
+                    const auto pins = visiblePins();
+                    require(pins.size() == 1 &&
+                                pins.first()
+                                    ->automationState()
+                                    .value(QStringLiteral("ready"))
+                                    .toBool() &&
+                                pins.first()->persistenceSnapshot().image == source,
+                            "startup maintenance runs only after the requested content frame");
+                }
+            });
+            require(maintenance == 0,
+                    "maintenance does not delay dispatch or run in the launch stack");
+            waitUntil([&] { return maintenance == 1; },
+                      "startup resumes after presentation or failure");
+            controller.start({}, [&] { ++maintenance; });
+            require(maintenance == 1, "startup maintenance runs only once");
+            closePins();
+        }
+        {
+            ScreenshotController controller;
+            int completed = 0;
+            controller.pinFilesToScreen({path}, [&] { ++completed; });
+            waitUntil([&] { return completed == 1; }, "first shell pin finishes");
+            require(settings.setDuplicateContentAction(QStringLiteral("none")),
+                    "consume duplicates");
+            controller.pinFilesToScreen({path}, [&] { ++completed; });
+            waitUntil([&] { return completed == 2; }, "duplicate also finishes the launch");
+            require(visiblePins().size() == 1, "duplicate completion creates no second window");
+            controller.pinFilesToScreen({}, [&] { ++completed; });
+            require(completed == 3, "empty launches also finish");
+            closePins();
+        }
+        return EXIT_SUCCESS;
+    }
+    if (application.arguments().contains(QStringLiteral("--image-editor-pin-tests"))) {
+        const auto shutdown = qScopeGuard([&] { storage.shutdown(); });
+        ScreenshotController controller;
+        snow_shot::presentation::ImageEditingServices services;
+        services.pin = [&controller](QImage image, auto completion) {
+            ScreenshotClipboardContent content;
+            content.image = std::move(image);
+            return controller.mcpPinContent(std::move(content), std::move(completion));
+        };
+        snow_shot::presentation::ImageEditingWindow editor(std::move(services));
+        snow_shot::presentation::ImageEditingSource source;
+        source.image = fixture();
+        source.canvasRect = QRectF(QPointF(), QSizeF(source.image.size()));
+        editor.present(source);
+        require(editor.document()->crop(
+                    snow_shot::presentation::ImageEditingDocument::CropAxis::Rows, 4, 12),
+                "editor controller fixture contains a cropped image");
+        const auto expected = editor.document()->image();
+        int exports = 0;
+        QObject::connect(&editor, &snow_shot::presentation::ImageEditingWindow::exportFinished,
+                         &editor, [&](bool success) {
+                             require(success, "editor image pins through the controller");
+                             ++exports;
+                         });
+        editor.palette()->pinRequested();
+        waitUntil([&] { return exports == 1 && visiblePins().size() == 1; },
+                  "edited image creates its own pinned window");
+        const auto first = visiblePins().first()->persistenceSnapshot();
+        require(first.image == expected && editor.modal()->isOpen() && !editor.dirty() &&
+                    source.image == fixture(),
+                "controller pins edited pixels without closing the editor or changing its source");
+        editor.palette()->pinRequested();
+        waitUntil([&] { return exports == 2 && visiblePins().size() == 2; },
+                  "a second editor activation creates a separate pin");
+        require(visiblePins()[0]->persistenceSnapshot().id !=
+                    visiblePins()[1]->persistenceSnapshot().id,
+                "successive editor pins have independent persistent identities");
+        editor.shutdown();
+        closePins();
+        return EXIT_SUCCESS;
+    }
     if (application.arguments().contains(QStringLiteral("--automatic-selection-tests"))) {
         canvas_automatic_selection_test::exercise([](auto verify) {
             ScreenshotController controller;
@@ -243,6 +490,13 @@ int runScreenshotControllerClipboardTests(int argc, char** argv) {
         });
         storage.shutdown();
         return 0;
+    }
+    if (application.arguments().contains(QStringLiteral("--copy-after-pin-tests"))) {
+        capturePinCopiesOnlyWhenEnabled();
+        QApplication::clipboard()->clear();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        storage.shutdown();
+        return EXIT_SUCCESS;
     }
     {
         ScreenshotController controller;

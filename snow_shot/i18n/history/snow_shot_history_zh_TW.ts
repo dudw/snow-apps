@@ -1099,6 +1099,10 @@ Files:
             <translation>圖片分割</translation>
         </message>
         <message>
+            <source>Image Stitching is busy. Try again when it finishes.</source>
+            <translation>圖片拼接忙碌中。請等待完成後重試。</translation>
+        </message>
+        <message>
             <source>Image loading could not be started. Try again.</source>
             <translation>無法開始載入圖像，請再試一次。</translation>
         </message>
@@ -1147,6 +1151,10 @@ Files:
             <translation>選擇圖像</translation>
         </message>
         <message>
+            <source>Stitch to PDF</source>
+            <translation>拼接為 PDF</translation>
+        </message>
+        <message>
             <source>The file manager is unavailable. Open it and try again.</source>
             <translation>檔案管理員無法使用，請開啟後再試一次。</translation>
         </message>
@@ -1169,6 +1177,53 @@ Files:
         <message>
             <source>The images could not be exported. Try again.</source>
             <translation>無法匯出圖像，請再試一次。</translation>
+        </message>
+    </context>
+    <context>
+        <name>LiveWindowSource</name>
+        <message>
+            <source>Allow Accessibility in System Settings to monitor the live window's state.</source>
+            <translation>請在系統設定中允許輔助使用權限，以監測即時視窗的狀態。</translation>
+        </message>
+        <message>
+            <source>Allow Screen &amp; System Audio Recording in System Settings to pin a live window.</source>
+            <translation>請在系統設定中允許螢幕與系統音訊錄製權限，以固定即時視窗。</translation>
+        </message>
+        <message>
+            <source>The live window display could not be initialized.</source>
+            <translation>無法初始化視窗即時顯示。</translation>
+        </message>
+        <message>
+            <source>The live window was closed.</source>
+            <translation>即時視窗已關閉。</translation>
+        </message>
+        <message>
+            <source>The selected window is no longer available.</source>
+            <translation>所選視窗已無法使用。</translation>
+        </message>
+        <message>
+            <source>The selected window's identity and state could not be verified.</source>
+            <translation>無法驗證所選視窗的識別資訊與狀態。</translation>
+        </message>
+        <message>
+            <source>The selection does not intersect the selected window.</source>
+            <translation>選取範圍與所選視窗沒有交集。</translation>
+        </message>
+        <message>
+            <source>The window content is temporarily unavailable. Retrying…</source>
+            <translation>視窗內容暫時無法使用，正在重試…</translation>
+        </message>
+        <message>
+            <source>The window is closed. The latest content cannot be displayed.</source>
+            <translation>視窗已關閉，無法顯示最新內容。</translation>
+        </message>
+        <message>
+            <source>The window is minimized. The latest content cannot be displayed.</source>
+            <translation>視窗已最小化，無法顯示最新內容。</translation>
+        </message>
+        <message>
+            <source>The window state is temporarily unavailable. Retrying…</source>
+            <translation>視窗狀態暫時無法使用，正在重試…</translation>
         </message>
     </context>
     <context>
@@ -1578,6 +1633,16 @@ Files:
             <source>%1%</source>
             <translation>%1%</translation>
         </message>
+        <message numerus="yes">
+            <source>%n window(s) displayed</source>
+            <translation>
+            <numerusform>已顯示 %n 個視窗</numerusform>
+        </translation>
+        </message>
+        <message>
+            <source>A pinned window is no longer available to save.</source>
+            <translation>一個貼圖視窗已無法儲存。</translation>
+        </message>
         <message>
             <source>AirDrop</source>
             <translation>AirDrop</translation>
@@ -1589,6 +1654,14 @@ Files:
         <message>
             <source>Annotation mode</source>
             <translation>標註模式</translation>
+        </message>
+        <message>
+            <source>Apply Crop</source>
+            <translation>套用裁剪</translation>
+        </message>
+        <message>
+            <source>Batch Actions</source>
+            <translation>批次操作</translation>
         </message>
         <message>
             <source>Cancel</source>
@@ -1621,6 +1694,14 @@ Files:
         <message>
             <source>Close this pinned window?</source>
             <translation>確定要關閉此固定到螢幕視窗嗎？</translation>
+        </message>
+        <message>
+            <source>Closed</source>
+            <translation>已關閉</translation>
+        </message>
+        <message>
+            <source>Convert to Image</source>
+            <translation>轉換為圖片</translation>
         </message>
         <message>
             <source>Copy original content</source>
@@ -1671,8 +1752,28 @@ Files:
             <translation>確定要銷毀此固定到螢幕視窗嗎？此操作無法復原。</translation>
         </message>
         <message>
-            <source>Display text recognition results</source>
-            <translation>顯示文字辨識結果</translation>
+            <source>Disable Hide to Top</source>
+            <translation>停用頂部隱藏</translation>
+        </message>
+        <message>
+            <source>Disable Lock Mode</source>
+            <translation>停用鎖定模式</translation>
+        </message>
+        <message>
+            <source>Disable Thumbnail Mode</source>
+            <translation>停用縮圖模式</translation>
+        </message>
+        <message>
+            <source>Enable Hide to Top</source>
+            <translation>啟用頂部隱藏</translation>
+        </message>
+        <message>
+            <source>Enable Lock Mode</source>
+            <translation>啟用鎖定模式</translation>
+        </message>
+        <message>
+            <source>Enable Thumbnail Mode</source>
+            <translation>啟用縮圖模式</translation>
         </message>
         <message>
             <source>Enable annotation mode</source>
@@ -1697,10 +1798,6 @@ Files:
         <message>
             <source>Group: Default</source>
             <translation>群組：預設</translation>
-        </message>
-        <message>
-            <source>Hide All Windows to Top</source>
-            <translation>所有視窗頂部隱藏</translation>
         </message>
         <message>
             <source>Hide other windows</source>
@@ -1731,12 +1828,20 @@ Files:
             <translation>提高速度</translation>
         </message>
         <message>
+            <source>Live content is unavailable. Retrying...</source>
+            <translation>即時內容暫時無法使用，正在重試...</translation>
+        </message>
+        <message>
             <source>Load new content</source>
             <translation>載入新內容</translation>
         </message>
         <message>
             <source>Lock mode</source>
             <translation>鎖定模式</translation>
+        </message>
+        <message>
+            <source>Minimized</source>
+            <translation>已最小化</translation>
         </message>
         <message>
             <source>Move window</source>
@@ -1751,8 +1856,20 @@ Files:
             <translation>下一影格</translation>
         </message>
         <message>
+            <source>No available output filename was found</source>
+            <translation>找不到可用的輸出檔案名稱</translation>
+        </message>
+        <message>
             <source>Opacity</source>
             <translation>不透明度</translation>
+        </message>
+        <message>
+            <source>Other windows could not be hidden.</source>
+            <translation>無法隱藏其他視窗。</translation>
+        </message>
+        <message>
+            <source>Other windows hidden.</source>
+            <translation>其他視窗已隱藏。</translation>
         </message>
         <message>
             <source>Pause</source>
@@ -1779,6 +1896,10 @@ Files:
             <translation>處理影像</translation>
         </message>
         <message>
+            <source>Recognition results</source>
+            <translation>辨識結果</translation>
+        </message>
+        <message>
             <source>Recognizing text</source>
             <translation>正在辨識文字</translation>
         </message>
@@ -1799,12 +1920,34 @@ Files:
             <translation>逆時針旋轉</translation>
         </message>
         <message>
+            <source>Save as File</source>
+            <translation>儲存為檔案</translation>
+        </message>
+        <message>
             <source>Save as file</source>
             <translation>另存為檔案</translation>
         </message>
         <message>
+            <source>Save displayed windows</source>
+            <translation>儲存已顯示的視窗</translation>
+        </message>
+        <message numerus="yes">
+            <source>Saved %n window(s).</source>
+            <translation>
+            <numerusform>已儲存 %n 個視窗。</numerusform>
+        </translation>
+        </message>
+        <message>
+            <source>Saved: %1; failed: %2.</source>
+            <translation>已儲存：%1；失敗：%2。</translation>
+        </message>
+        <message>
             <source>Scale</source>
             <translation>縮放</translation>
+        </message>
+        <message>
+            <source>Select All</source>
+            <translation>全選</translation>
         </message>
         <message>
             <source>Show all windows</source>
@@ -1823,20 +1966,40 @@ Files:
             <translation>顯示陰影</translation>
         </message>
         <message>
+            <source>Show text</source>
+            <translation>顯示文字</translation>
+        </message>
+        <message>
             <source>Supported files (%1)</source>
             <translation>支援的檔案 (%1)</translation>
+        </message>
+        <message>
+            <source>Text type: %1</source>
+            <translation>文字類型：%1</translation>
         </message>
         <message>
             <source>The animation could not be played</source>
             <translation>無法播放動畫</translation>
         </message>
         <message>
+            <source>The current window content cannot be captured.</source>
+            <translation>無法擷取視窗的目前內容。</translation>
+        </message>
+        <message>
             <source>The image could not be saved automatically: %1</source>
             <translation>無法自動儲存影像：%1</translation>
         </message>
         <message>
+            <source>The live window requires a current frame snapshot.</source>
+            <translation>即時視窗需要取得目前影格快照。</translation>
+        </message>
+        <message>
             <source>The new content could not be loaded</source>
             <translation>無法載入新內容</translation>
+        </message>
+        <message>
+            <source>The output directory could not be created</source>
+            <translation>無法建立輸出目錄</translation>
         </message>
         <message>
             <source>The pinned image copy could not be started</source>
@@ -1855,8 +2018,32 @@ Files:
             <translation>無法開始儲存已固定到螢幕的影像</translation>
         </message>
         <message>
+            <source>The window changed while preparing the image. Please try again.</source>
+            <translation>準備圖片時視窗發生變更，請再試一次。</translation>
+        </message>
+        <message>
+            <source>The window is closed. The latest content cannot be displayed.</source>
+            <translation>視窗已關閉，無法顯示最新內容。</translation>
+        </message>
+        <message>
+            <source>The window is minimized. The latest content cannot be displayed.</source>
+            <translation>視窗已最小化，無法顯示最新內容。</translation>
+        </message>
+        <message>
             <source>Thumbnail mode</source>
             <translation>縮圖模式</translation>
+        </message>
+        <message>
+            <source>Translation results</source>
+            <translation>翻譯結果</translation>
+        </message>
+        <message>
+            <source>Unavailable</source>
+            <translation>暫時無法使用</translation>
+        </message>
+        <message>
+            <source>Untitled window</source>
+            <translation>無標題視窗</translation>
         </message>
         <message>
             <source>Uploaded to cloud. Link copied to clipboard.</source>
@@ -2101,10 +2288,20 @@ Files:
             <translation>銷毀</translation>
         </message>
         <message numerus="yes">
+            <source>Destroy %n displayed window(s)? This action cannot be undone.</source>
+            <translation>
+            <numerusform>要銷毀已顯示的 %n 個視窗嗎？此操作無法復原。</numerusform>
+        </translation>
+        </message>
+        <message numerus="yes">
             <source>Destroy %n selected window(s)? This action cannot be undone.</source>
             <translation>
             <numerusform>銷毀所選的 %n 個視窗？此操作無法復原。</numerusform>
         </translation>
+        </message>
+        <message>
+            <source>Destroy displayed windows</source>
+            <translation>銷毀已顯示的視窗</translation>
         </message>
         <message>
             <source>Destroy selected windows</source>
@@ -2133,6 +2330,10 @@ Files:
         <message>
             <source>New Group</source>
             <translation>新增群組</translation>
+        </message>
+        <message>
+            <source>The displayed windows could not be destroyed.</source>
+            <translation>無法銷毀已顯示的視窗。</translation>
         </message>
         <message>
             <source>The selected windows could not be destroyed.</source>

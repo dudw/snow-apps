@@ -7,6 +7,8 @@
 #include "snow_shot/runtime/runtimeactivitytracker.h"
 
 #include "snow_shot/presentation/screenshotpinnedwindow.h"
+#include "snow_shot/presentation/livewindowsource.h"
+#include "snow_shot/presentation/imageeditingdocument.h"
 #include "snow_shot/presentation/screenshothistorytypes.h"
 #include "snow_shot/presentation/screenshotselectionpin.h"
 #include "snow_shot/presentation/pinnedgeometry.h"
@@ -914,7 +916,8 @@ bool ScreenshotSelectionExportUiServices::presentPinnedImageArtifact(
 
 bool ScreenshotSelectionExportUiServices::presentDecodedContentOnScreen(
     ScreenshotClipboardContent content, QScreen* screen, bool autoResizeWindow,
-    snow_shot::storage::PinnedWindowCreationSource source) {
+    snow_shot::storage::PinnedWindowCreationSource source, bool initialAnnotationMode,
+    PinnedCompletion completion) {
     if (screen == nullptr || !content.isValid()) {
         return false;
     }
@@ -927,14 +930,17 @@ bool ScreenshotSelectionExportUiServices::presentDecodedContentOnScreen(
            presentPinnedImage(
                content.image, screen, fit.nativeGeometry, fit.initialWindowSize,
                std::move(content.formattedDocument), content.plainText,
-               content.formattedTextDevicePixelRatio, std::move(content.originalContent), {}, {},
+               content.formattedTextDevicePixelRatio, std::move(content.originalContent), {},
+               std::move(completion),
                content.appearance ? content.appearance->borderAppearance : std::nullopt,
                content.appearance ? std::optional(content.appearance->checkerboardEnabled)
                                   : std::nullopt,
                source, std::move(content.sourceIdentity),
                content.appearance ? content.appearance->showBorder : std::nullopt,
                content.appearance ? content.appearance->showShadow : std::nullopt,
-               std::move(content.animationSource));
+               std::move(content.animationSource), initialAnnotationMode,
+               content.preparedImageTransform.isIdentity() ? std::move(content.preparedDisplayImage)
+                                                           : QImage{});
 }
 
 bool ScreenshotSelectionExportUiServices::presentPinnedImage(
@@ -947,7 +953,8 @@ bool ScreenshotSelectionExportUiServices::presentPinnedImage(
     std::optional<bool> checkerboardEnabled, snow_shot::storage::PinnedWindowCreationSource source,
     snow_shot::storage::PinnedSourceIdentity sourceIdentity,
     std::optional<bool> initialBorderVisible, std::optional<bool> initialShadowVisible,
-    std::shared_ptr<const ScreenshotAnimationSource> animationSource) {
+    std::shared_ptr<const ScreenshotAnimationSource> animationSource, bool initialAnnotationMode,
+    QImage preparedDisplayImage) {
     const QSize imageSize =
         !image.isNull() && !image.size().isEmpty() ? image.size() : initialWindowSize;
     if (imageSize.isEmpty() || (!imageLoader && image.isNull()) || screen == nullptr ||
@@ -960,7 +967,8 @@ bool ScreenshotSelectionExportUiServices::presentPinnedImage(
         formattedPlainText, formattedTextDevicePixelRatio, std::move(originalContent),
         std::move(imageLoader), std::move(completion), std::move(borderAppearance),
         checkerboardEnabled, source, nullptr, std::move(sourceIdentity), initialBorderVisible,
-        initialShadowVisible, std::move(animationSource));
+        initialShadowVisible, std::move(animationSource), initialAnnotationMode,
+        std::move(preparedDisplayImage));
 }
 
 bool ScreenshotSelectionExportUiServices::presentCompositedSelectionImage(
@@ -990,7 +998,8 @@ bool ScreenshotSelectionExportUiServices::presentPinnedImageOnCanvas(
     std::optional<bool> checkerboardEnabled, snow_shot::storage::PinnedWindowCreationSource source,
     const ScreenshotHistoryEntry* document, snow_shot::storage::PinnedSourceIdentity sourceIdentity,
     std::optional<bool> initialBorderVisible, std::optional<bool> initialShadowVisible,
-    std::shared_ptr<const ScreenshotAnimationSource> animationSource) {
+    std::shared_ptr<const ScreenshotAnimationSource> animationSource, bool initialAnnotationMode,
+    QImage preparedDisplayImage) {
     SNOW_SHOT_PIN_PERF_SCOPE("ui.present_pinned_image");
     const QSize imageSize =
         !image.isNull() && !image.size().isEmpty() ? image.size() : initialWindowSize;
@@ -1022,6 +1031,8 @@ bool ScreenshotSelectionExportUiServices::presentPinnedImageOnCanvas(
     auto* pinnedWindow = m_windowPool != nullptr ? m_windowPool->acquire(screen) : nullptr;
     ScreenshotPinnedWindow::Config config;
     config.creationSource = source;
+    config.initialAnnotationMode = initialAnnotationMode;
+    config.preparedDisplayImage = std::move(preparedDisplayImage);
     config.sourceIdentity = std::move(sourceIdentity);
     config.animationSource = std::move(animationSource);
     config.nativeGeometry = nativeGeometry;
@@ -1133,6 +1144,53 @@ bool ScreenshotSelectionExportUiServices::presentPinnedDocument(const QImage& ba
         snow_shot::storage::PinnedWindowCreationSource::ScreenshotHistory, &entry);
 }
 
+bool ScreenshotSelectionExportUiServices::presentLiveWindow(
+    std::shared_ptr<snow_shot::presentation::LiveWindowSource> source, QScreen* screen,
+    const QRect& nativeGeometry, const QSize& initialWindowSize, PinnedCompletion completion) {
+    if (!source || source->initialFrame().isNull() || !screen || !nativeGeometry.isValid())
+        return false;
+    auto* window = m_windowPool ? m_windowPool->acquire(screen) : nullptr;
+    if (!window)
+        return false;
+    ScreenshotPinnedWindow::Config config;
+    config.liveSource = std::move(source);
+    config.screen = screen;
+    config.nativeGeometry = nativeGeometry;
+    config.initialWindowSize = initialWindowSize;
+    config.canvasSourceRect = QRectF(QPointF(), QSizeF(initialWindowSize));
+    config.checkerboardEnabled = false;
+    config.imageSource = ScreenshotImageSource::fromImage(config.liveSource->initialFrame(),
+                                                          config.canvasSourceRect);
+    config.groupManager = m_groupManager;
+    config.selectionController = m_selectionController.get();
+    config.groupId = m_groupManager ? m_groupManager->activeGroupId() : QStringLiteral("default");
+    config.creationSource = snow_shot::storage::PinnedWindowCreationSource::Screenshot;
+    config.recognitionProvider = m_recognitionProvider;
+    applyPinRuntimeSettings(&config);
+    config.persistenceId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    // Supply ordinary callbacks for conversion, without reserving a recoverable live record.
+    applyPersistence(&config, config.persistenceId);
+    config.persistenceWriter = [](const snow_shot::storage::PinnedWindowRecord& record) {
+        auto& storage = snow_shot::storage::ApplicationStorage::instance();
+        if (storage.isInitialized()) {
+            auto& repository = storage.pinnedWindows();
+            static_cast<void>(repository.summary(record.id) ? repository.updateState(record)
+                                                            : repository.upsert(record));
+        }
+    };
+    configureVisibility(&config);
+    if (m_liveImageEditingRequested) {
+        QObject::connect(window, &ScreenshotPinnedWindow::imageEditingSnapshotRequested, window,
+                         [handler = m_liveImageEditingRequested](
+                             const snow_shot::presentation::ImageEditingSource& snapshot) {
+                             handler(ScreenshotExportSource::fromImage(snapshot.image));
+                         });
+    }
+    return presentPinnedWindowAndSynchronize(m_windowPool.get(), window, config,
+                                             m_showMainWindowRequested, m_imageSplittingRequested,
+                                             m_imageEditingRequested, std::move(completion));
+}
+
 void ScreenshotSelectionExportUiServices::configureVisibility(
     ScreenshotPinnedWindow::Config* config) {
     const QPointer<ScreenshotPendingPinCoordinator> lifetime(m_pendingPinCoordinator.get());
@@ -1146,6 +1204,10 @@ void ScreenshotSelectionExportUiServices::configureVisibility(
     config->hideOtherWindowsRequested = [this, lifetime](const QString& id) {
         if (!lifetime.isNull())
             static_cast<void>(hideOtherWindows(id));
+    };
+    config->shakeHideOtherWindowsRequested = [this, lifetime](const QString& id) {
+        return lifetime.isNull() ? ScreenshotPinnedWindow::HideOtherWindowsResult{}
+                                 : hideOtherWindowsWithResult(id);
     };
 }
 
@@ -1243,20 +1305,38 @@ void ScreenshotSelectionExportUiServices::showAllWindows() {
 }
 
 bool ScreenshotSelectionExportUiServices::hideOtherWindows(const QString& exceptId) {
+    return hideOtherWindowsWithResult(exceptId).success;
+}
+
+ScreenshotPinnedWindow::HideOtherWindowsResult
+ScreenshotSelectionExportUiServices::hideOtherWindowsWithResult(const QString& exceptId) {
     auto& storage = snow_shot::storage::ApplicationStorage::instance();
     if (!storage.isInitialized())
-        return false;
+        return {};
     const QString group =
         m_groupManager ? m_groupManager->activeGroupId() : QStringLiteral("default");
     const auto records = storage.pinnedWindows().summariesIncludingPending();
     QVector<QString> ids;
-    for (const auto& record : records)
-        if (!record.ignored && record.groupId == group && record.id != exceptId)
+    bool changed = false;
+    QSet<QString> seen;
+    ids.reserve(records.size() + m_restoringIds.size());
+    seen.reserve(records.size());
+    for (const auto& record : records) {
+        if (!record.ignored && record.groupId == group && record.id != exceptId) {
             ids.append(record.id);
-    for (auto it = m_restoringIds.cbegin(); it != m_restoringIds.cend(); ++it)
-        if (it->groupId == group && it.key() != exceptId && !ids.contains(it.key()))
+            seen.insert(record.id);
+            changed |= !record.hidden;
+        }
+    }
+    for (auto it = m_restoringIds.cbegin(); it != m_restoringIds.cend(); ++it) {
+        if (it->groupId == group && it.key() != exceptId) {
+            changed = true;
+            if (seen.contains(it.key()))
+                continue;
             ids.append(it.key());
-    return hideRecords(ids);
+        }
+    }
+    return {hideRecords(ids), changed};
 }
 
 bool ScreenshotSelectionExportUiServices::toggleAllWindowsVisibility() {
@@ -1482,6 +1562,9 @@ bool ScreenshotSelectionExportUiServices::presentRestoredRecord(
     config.initialPreparedAnimationTransform = initialPreparedAnimationTransform;
     config.persistedAnimationSpeedPercent = record.animationSpeedPercent;
     config.persistedAnimationPlaying = record.animationPlaying;
+    config.persistedExactInitialWindowSize = record.exactInitialWindowSize;
+    config.persistedCropRect = record.cropRect;
+    config.persistedScalePercent = record.scalePercent;
     config.persistedImageTransform = record.imageTransform;
     config.persistedQuarterTurns = record.quarterTurns;
     config.persistedHideToTopMode = record.hideToTopMode;
@@ -1498,6 +1581,7 @@ bool ScreenshotSelectionExportUiServices::presentRestoredRecord(
     config.persistedFirstCreationTextDpi = record.firstCreationTextDpi;
     config.persistedCanvasSession = record.canvasSession;
     config.persistedRecognitionResults = record.recognitionResults;
+    config.persistedTextType = record.textType;
     config.persistedRecognitionVisible = record.recognitionVisible;
     config.persistedTranslationVisible = record.translationVisible;
     config.groupManager = m_groupManager;
